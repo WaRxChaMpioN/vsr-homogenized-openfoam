@@ -30,6 +30,11 @@ def r0(v):
     return f"{Decimal(str(v)).quantize(Decimal('1'), ROUND_HALF_UP)}"
 
 
+def r1(v):
+    """Round half up to one decimal (as printed in Table 4)."""
+    return float(Decimal(str(v)).quantize(Decimal('0.1'), ROUND_HALF_UP))
+
+
 def num(v, fmt):
     """A signed table number in math mode, so that negatives get a minus sign, not a hyphen."""
     return '$' + format(v, fmt) + '$'
@@ -44,14 +49,16 @@ def table4():
     rows = []
     for G in D.G_LEVELS:
         for k, Re in enumerate(D.RE_LEVELS):
-            tp = T_PORE[(G, Re)]
+            # temperatures to 0.1 K, and the deviation and efficiencies from the printed values, so
+            # that they can be recomputed from the table itself
+            tp = r1(T_PORE[(G, Re)])
             if D.available(G, Re):
-                tm = D.energy(G, Re)['T_out']
-                cells = [r0(tm), num(100 * (tp - tm) / tp, '.1f'), f'{efficiency(G, Re, tp):.1f}', f'{efficiency(G, Re, tm):.1f}']
+                tm = r1(D.energy(G, Re)['T_out'])
+                cells = [f'{tm:.1f}', num(100 * (tp - tm) / tp, '.1f'), f'{efficiency(G, Re, tp):.1f}', f'{efficiency(G, Re, tm):.1f}']
             else:
                 cells = ['--'] * 2 + [f'{efficiency(G, Re, tp):.1f}', '--']
             g = rf'${D.G_LABEL[G]}$' if k == 0 else ''
-            rows.append(f'{g} & {Re} & {r0(tp)} & ' + ' & '.join(cells) + r' \\')
+            rows.append(f'{g} & {Re} & {tp:.1f} & ' + ' & '.join(cells) + r' \\')
         rows.append(r'\addlinespace')
     body = '\n'.join(rows[:-1])
     return rf"""\begin{{table}}[H]

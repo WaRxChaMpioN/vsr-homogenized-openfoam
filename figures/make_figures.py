@@ -432,7 +432,55 @@ def fig14():
                 os.remove(p)
 
 
-FIGS = {f'fig{n:02d}': globals()[f'fig{n:02d}'] for n in (4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)}
+# ------------------------------------------------------------------------------------ Fig 15
+def fig15():
+    """Wall temperature averaged around the perimeter along the channel, macroscopic (profiles.py:
+    wallT_mean, area-mean of the four walls per cell layer) against the line-averaged wall
+    temperature of the pore-scale model (paper 1 Fig 17, data/pore_scale_wallT_digitised.csv), one
+    panel per Re, the three G in each; one y range for the three panels."""
+    import os
+    csv = os.path.join(S.HERE, 'data', 'pore_scale_wallT_digitised.csv')
+    pore = np.genfromtxt(csv, delimiter=',', names=True, dtype=None, encoding=None) if os.path.isfile(csv) else None
+    data = {}
+    for Re in D.RE_LEVELS:
+        for G in D.G_LEVELS:
+            if pore is not None:
+                m = np.isclose(pore['G'].astype(float), float(G)) & (pore['Re'] == Re)
+                if m.any():
+                    data[('pore', G, Re)] = (pore['x_mm'][m], pore['T_K'][m])
+            if D.available(G, Re):
+                p = D.profile(G, Re)
+                data[('macro', G, Re)] = (p['x_mm'], p['wallT_mean'])
+    if not data:
+        return
+    top = max(T.max() for x, T in data.values())
+    for k, Re in enumerate(D.RE_LEVELS):
+        fig, ax = plt.subplots(figsize=(0.7 * W, 2.45))
+        ax.axvspan(75, 125, color='#ececec', lw=0)
+        groups = []
+        for G in D.G_LEVELS:
+            group = []
+            for model, colour, ls, label in (('pore', S.SERIES[1], S.LINESTYLES[1], 'pore scale'),
+                                             ('macro', S.SERIES[0], S.LINESTYLES[0], 'macroscopic (this work)')):
+                if (model, G, Re) in data:
+                    x, T = data[(model, G, Re)]
+                    group.append((x, T))
+                    ax.plot(x, T, color=colour, ls=ls, lw=1.1 if model == 'macro' else 1.0, label=label)
+            groups.append((G, group))
+        _profile_axes(ax, top)
+        ax.set_ylabel(r'Wall temperature, $T_w$ (K)')
+        if k < len(D.RE_LEVELS) - 1:
+            ax.set_xlabel('')
+        _group_labels(ax, groups)
+        ax.text(0.015, 0.96, rf'$Re = {Re}$', transform=ax.transAxes, ha='left', va='top', fontsize=8.5)
+        if k == 0:
+            handles, labels = ax.get_legend_handles_labels()
+            keep = {l: h for h, l in zip(handles, labels)}
+            ax.legend(list(keep.values()), list(keep.keys()), loc='upper right', bbox_to_anchor=(1.0, 0.97))
+        S.save(fig, f'fig15{"abc"[k]}_wall_temperature_Re{Re}')
+
+
+FIGS = {f'fig{n:02d}': globals()[f'fig{n:02d}'] for n in (4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)}
 
 if __name__ == '__main__':
     todo = sys.argv[1:] or ['all']

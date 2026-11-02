@@ -26,7 +26,7 @@ by the scripts, see *Running*).
 | `case/cht` | stage 3: three-region heat-transfer case (template): coded temperature conditions `system/radiativeInterfaceT` (opaque porous faces) and `system/radiativeWallT` (channel walls), energy books `system/balanceFunctions` and `system/auditFunctions`, parameters `system/caseParameters` |
 | `case/scripts` | `Allrun.flow`, `Allrun.split`, `Allrun.cht`, `Allpost`, `Allrun.matrix` (all nine G, Re cases), `stopWhenConverged.sh`, `restorePhi.py`, `energyBalance.py`, `genBlockMeshDict.py`, `genFunctions.py`, `rotPoints.py`; `design/`: derivation checks of the boundary-condition maths and the mesh grading |
 | `tools` | post-processing and checks (Python) |
-| `figures` | the paper's figures and Tables 3-4 from the runs; `data/` holds the pore-scale bulk temperatures digitised from the pore-scale paper (Fig 13) |
+| `figures` | the paper's figures and Tables 3-4 from the runs; `data/` holds the pore-scale bulk and wall temperatures read from the pore-scale paper's figures (Figs 13 and 15) |
 | `docs/model.md` | the model in detail: what each modelling choice fixes, the checks, the angular-discretisation study, OpenFOAM-v2206 notes |
 
 ## The receiver
@@ -224,9 +224,14 @@ Its cost column comes from `studies/log.timing`: the three meshes continued for 
 14 ranks back to back (lines `coarse|base|fine <t> s/it`, the mean over the last 100 iterations),
 scaled to the adopted mesh's own cost; without it the coarse and fine costs are left blank.
 
-Fig 13 compares with the pore-scale bulk temperatures, digitised from the pore-scale paper's Fig 13
-(`figures/data/pore_scale_bulkT_digitised.csv`: outlet values within 0.8 K of that paper's table,
-about +-1 K on the gentle parts and +-5-15 K on the steep rise at the front face).
+Fig 13 compares with the pore-scale bulk temperatures, read from the pore-scale paper's Fig 13
+(`figures/data/pore_scale_bulkT_digitised.csv`: outlet values equal to that paper's table, about
++-1 K on the gentle parts and +-5-15 K on the steep rise at the front face).
+
+Fig 15 compares the wall temperature averaged around the perimeter (`tools/profiles.py`,
+`wallT_mean`) with the line-averaged wall temperature of the pore-scale paper's Fig 17, for all G and
+Re (`figures/data/pore_scale_wallT_digitised.csv`, read from that figure by
+`figures/data/digitise_fig17.py`; about +-5 K where the curves are apart).
 
 ## Tools
 

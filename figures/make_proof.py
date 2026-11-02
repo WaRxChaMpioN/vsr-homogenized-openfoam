@@ -49,9 +49,11 @@ FIGS = [
     (g('fig12_fluid_temperature_profile', r'0.7\linewidth'),
      r'Mass-weighted average (bulk) fluid temperature along the channel for all $G$ and $Re$. The distance is measured from the inlet; shaded: pseudo-porous zone.'),
     (g('fig13_fluid_temperature_comparison', r'0.7\linewidth'),
-     r'Bulk fluid temperature from the pore-scale (digitised from \cite{effective_our}) and macroscopic models for $Re = 300$. The distance is measured from the inlet; shaded: pseudo-porous zone.'),
+     r'Bulk fluid temperature from the pore-scale \cite{effective_our} and macroscopic models for $Re = 300$. The distance is measured from the inlet; shaded: pseudo-porous zone.'),
     (stacked(['fig14a_wall_total_heat_flux', 'fig14b_wall_radiative_flux', 'fig14c_wall_temperature']),
      r'(a) Total heat flux into the wall, $q_w$, by conduction from the adjacent medium and by radiation (equal to the heat lost to the surroundings), (b) net radiative heat flux absorbed by the wall, $q_{rad,w}$, on the colour scale of (a), and (c) temperature on the top wall of the channel ($y = 50$~mm) for $G = 5 \times 10^{6}$~W\,m$^{-2}$ and $Re = 300$. The distance is measured from the inlet.'),
+    (stacked(['fig15a_wall_temperature_Re300', 'fig15b_wall_temperature_Re600', 'fig15c_wall_temperature_Re900'], r'0.7\linewidth'),
+     r'Wall temperature along the channel, averaged around its perimeter, for (a) $Re = 300$, (b) $Re = 600$ and (c) $Re = 900$ at the three irradiation levels: macroscopic model and pore-scale model \cite{effective_our}. The distance is measured from the inlet; shaded: pseudo-porous zone.'),
 ]
 
 
