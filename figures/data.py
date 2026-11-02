@@ -1,8 +1,8 @@
 """
 Data for the paper-2 figures, read from the run directory of Allrun.matrix ($VSR_RUNS, default
 <repository>/runs):
-  G<G>_Re<Re>_6x11   heat-transfer runs; un-rotated copy in post/<time> (Allpost), profiles CSV in
-                     figures/, energy balance in log.energyBalance
+  G<G>_Re<Re>_6x11   heat-transfer runs; un-rotated copy in post/<time> (Allpost), face-plane bulk
+                     temperature (bulkFaces.py) in figures/, energy balance in log.energyBalance
   flow_Re<Re>        single-region flow runs (un-rotated by construction, metres)
 Coordinates are channel-frame mm: x from the inlet (0-275), y and z across the channel (0-50).
 The mid-plane is y = 25 mm (the x-z plane of the manuscript's Figs 5, 7, 9 and 10), the top wall
@@ -168,6 +168,14 @@ def profile(G, Re):
     """Axial profiles of profiles.py (x_mm, bulkT, meanT, Tmin, Tmax, Tcentre, wallT_mean, ...)."""
     t = post_time(G, Re)
     return np.genfromtxt(os.path.join(case_dir(G, Re), 'figures', f'profiles_{t}.csv'),
+                         delimiter=',', names=True)
+
+
+def bulk_faces(G, Re):
+    """Bulk temperature on the face planes from the face mass fluxes, inlet to outlet (bulkFaces.py:
+    x_mm, bulkT, mdot_rel); the outlet value is that of the energy balance."""
+    t = post_time(G, Re)
+    return np.genfromtxt(os.path.join(case_dir(G, Re), 'figures', f'bulk_faces_{t}.csv'),
                          delimiter=',', names=True)
 
 

@@ -136,6 +136,7 @@ cp -r $VSR/case/cht G5e6_Re300_6x11 && cp $VSR/case/scripts/Allrun.cht $VSR/case
 (cd G5e6_Re300_6x11 && ./Allpost)
 mkdir -p G5e6_Re300_6x11/figures
 python3 $VSR/tools/profiles.py G5e6_Re300_6x11/post <time> G5e6_Re300_6x11/figures/profiles_<time>.csv
+python3 $VSR/tools/bulkFaces.py G5e6_Re300_6x11/post <time> G5e6_Re300_6x11/figures/bulk_faces_<time>.csv
 python3 $VSR/tools/negativeRays.py G5e6_Re300_6x11 <time>
 ```
 
@@ -214,6 +215,7 @@ about +-1 K on the gentle parts and +-5-15 K on the steep rise at the front face
 | `beamAlign.py` | fvDOM ordinate set, beam ordinate, rotation for `transformPoints`, boundary sink rays |
 | `angularCheck.py` | hemispherical weight error of fvDOM's diffuse emission on each boundary orientation of the rotated channel, for any (nPhi, nTheta) |
 | `profiles.py` | axial profiles per cell layer: bulk, mean, min, max and centreline temperature, wall temperature and absorbed radiation |
+| `bulkFaces.py` | bulk temperature on every face plane from the face mass fluxes, inlet to outlet (Figs 12-13); its outlet value is that of the energy balance |
 | `negativeRays.py <case> <time>` | minimum of every ray intensity field (the case itself, not `post/`) |
 | `symmetryCheck.py [--figure f.png] label=<case>/post:<time> ...` | angular error from the departure from the square symmetry of the case |
 | `fieldDiff.py <caseA>/post:<t> <caseB>/post:<t>` | cell-by-cell and face-by-face difference of two runs on the same mesh |

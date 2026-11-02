@@ -298,10 +298,12 @@ def fig11():
 
 # ------------------------------------------------------------------------------------ Fig 12
 def bulk_profile(G, Re):
-    """Bulk temperature from the inlet (300 K at x = 0) through the cell layers to the outlet bulk
-    temperature of the energy balance at x = 275 mm (the Table 4 value)."""
-    p = D.profile(G, Re)
-    return (np.r_[0.0, p['x_mm'], 275.0], np.r_[300.0, p['bulkT'], D.energy(G, Re)['T_out']])
+    """Bulk temperature on the face planes, from the face mass fluxes: 300 K on the inlet plane, the
+    face temperature on the two porous faces and the outlet bulk temperature of the energy balance at
+    x = 275 mm (the Table 4 value)."""
+    b = D.bulk_faces(G, Re)
+    assert abs(b['bulkT'][-1] - D.energy(G, Re)['T_out']) < 0.01
+    return b['x_mm'], b['bulkT']
 
 
 def fig12():
