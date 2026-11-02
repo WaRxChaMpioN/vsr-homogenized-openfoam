@@ -10,8 +10,8 @@ matter) and every bin is one axial cell layer of the mesh, bounded by its own po
 
 Per cell layer (x = distance from the inlet along the axis, mm):
   bulkT      mass-flow-weighted fluid temperature  sum(Ux T V)/sum(Ux V)   [K]
-             (cell-centre velocity; the exact face-plane bulk temperature of Figs 12-13,
-             from the face mass fluxes, is bulkFaces.py)
+             (cell-centre velocity; the bulk temperature of Figs 12-13, from the solver's face mass fluxes
+             and convective face values, is bulkFaces.py)
   meanT      volume-mean temperature                                     [K]
   Tmin, Tmax temperature range in the cross-section                      [K]
   Tcentre    temperature of the cells nearest the channel axis (y = z = 25 mm) [K]

@@ -5,6 +5,8 @@ Data for the paper-2 figures, read from the run directory of Allrun.matrix ($VSR
                      temperature (bulkFaces.py) in figures/, energy balance in log.energyBalance
   flow_Re<Re>        single-region flow runs (un-rotated by construction, metres)
 Coordinates are channel-frame mm: x from the inlet (0-275), y and z across the channel (0-50).
+They are the case's coordinates; the paper (Fig 2) calls the vertical axis y and the horizontal one
+across the channel z, so the plots label this module's z as y and its y as z.
 The mid-plane is y = 25 mm (the x-z plane of the manuscript's Figs 5, 7, 9 and 10), the top wall
 is z = 50 mm (Fig 14). Slices are structured arrays that include the boundary values (walls,
 opaque porous faces, inlet, outlet), so contours reach the walls.

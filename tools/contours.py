@@ -19,7 +19,7 @@ from matplotlib.colors import LinearSegmentedColormap, LogNorm, Normalize
 from matplotlib.tri import Triangulation
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from foamio import read_field, patch_geometry
+from foamio import read_field, patch_geometry, frame, cluster      # frame, cluster: numpy only
 
 ALL_REGIONS = ['inletRegion', 'interface', 'porousRegion', 'exitRegion']
 FACE_PATCHES = {'front': 'porousRegion_to_inletRegion', 'back': 'porousRegion_to_exitRegion'}   # corrected model
@@ -32,24 +32,6 @@ STYLES = ['-', (0, (5, 3)), (0, (1, 2)), (0, (6, 2, 1, 2))]   # secondary encodi
 plt.rcParams.update({'figure.facecolor': SURFACE, 'axes.facecolor': SURFACE, 'savefig.facecolor': SURFACE,
                      'text.color': INK, 'axes.labelcolor': INK2, 'xtick.color': INK2, 'ytick.color': INK2,
                      'axes.edgecolor': '#b8b7b2', 'font.size': 10, 'axes.titlesize': 11})
-
-
-def frame(case):
-    """Channel frame taken from the mesh itself (handles any residual rigid rotation, roll included):
-    axis e from the inlet-plane normal, e3 from the normals of the z = 50 mm wall, e2 = e3 x e;
-    origin such that the inlet plane is x = 0 and the channel spans y, z = 0..50 mm."""
-    geo = patch_geometry(f'{case}/constant/inletRegion/polyMesh')
-    Cf = np.vstack([geo[p][0] for p in ('inlet', 'opticalWindow')])
-    Sf = np.vstack([geo[p][1] for p in ('inlet', 'opticalWindow')])
-    A = np.linalg.norm(Sf, axis=1)
-    e = -Sf.sum(0); e /= np.linalg.norm(e)
-    P0 = (Cf * A[:, None]).sum(0) / A.sum()                      # centre of the inlet plane
-    Sw = geo['inletWall'][1]
-    nw = Sw / np.linalg.norm(Sw, axis=1)[:, None]
-    top = nw @ np.array([0.0, 0.0, 1.0]) > 0.9                     # faces of the z = 50 mm wall
-    e3 = nw[top].mean(0); e3 -= (e3 @ e) * e; e3 /= np.linalg.norm(e3)
-    e2 = np.cross(e3, e)
-    return lambda X: np.stack([(X - P0) @ e, (X - P0) @ e2 + 0.025, (X - P0) @ e3 + 0.025], axis=-1) * 1e3
 
 
 def load(case, t):
@@ -91,16 +73,6 @@ def midplane(c):
     for f in ('x', 'y', 'T', 'G', 'U', 'p'):
         out[f] = np.bincount(inv, weights=c[f][m]) / np.bincount(inv)
     return out
-
-
-def cluster(v, tol=0.02):
-    """Index of each value's cluster (values within tol mm of their neighbour belong together) and the cluster centres."""
-    order = np.argsort(v)
-    vs = v[order]
-    cid_sorted = np.cumsum(np.concatenate([[True], np.diff(vs) > tol])) - 1
-    cid = np.empty_like(cid_sorted)
-    cid[order] = cid_sorted
-    return cid, np.bincount(cid, weights=v) / np.bincount(cid)
 
 
 def grid2d(a, b, v):

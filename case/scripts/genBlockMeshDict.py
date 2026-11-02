@@ -10,16 +10,23 @@ The 0.081 mm upstream face cell keeps the cell Peclet number U*dx/alpha_air belo
 the outflow through the hot, opaque front face stays bounded (see outflow_face_1d.py).
 The porous zone is fine at both ends because the cell-centre velocity wiggles in the 2-3 cells next
 to a resistance jump (the face fluxes stay exact). With the old one-sided grading (last cell 4.88 mm)
-the Darcy-Forchheimer sink integrated to 7.26 Pa instead of 7.50 Pa at Re 300."""
+the Darcy-Forchheimer sink integrated to 7.26 Pa instead of 7.50 Pa at Re 300.
+
+    genBlockMeshDict.py [blockMeshDict] [scale]
+
+scale multiplies every cell count with the same gradings (the mesh study of Table 3: 0.75 gives
+33 x 33 x 80 = 87,120 cells, 1.25 gives 55 x 55 x 136 = 411,400 cells; default 1, 209,088 cells)."""
 import sys
+f = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
+n = lambda c: round(c * f)
 xs = [0.0, 75.0, 125.0, 275.0]
 yz = [0.0, 12.5, 37.5, 50.0]
 zones = ['inletRegion', 'porousRegion', 'exitRegion']
 walls = ['inletWall', 'porousWall', 'exitWall']
 axial = [
-    ('48', '((0.9333333333 0.7291666667 0.2857142857) (0.0666666667 0.2708333333 0.08))'),
-    ('30', '((0.5 0.5 5.6535) (0.5 0.5 0.176882))'),
-    ('30', '4'),
+    (str(n(48)), '((0.9333333333 0.7291666667 0.2857142857) (0.0666666667 0.2708333333 0.08))'),
+    (str(n(30)), '((0.5 0.5 5.6535) (0.5 0.5 0.176882))'),
+    (str(n(30)), '4'),
 ]
 def v(s, j, k):          # station s (x), j: y index, k: z index
     return 16*s + 4*k + j
@@ -45,10 +52,10 @@ FoamFile
 
 scale 0.001;
 
-nW      12;     // cells in each 12.5 mm wall band (0.63 mm at the wall -> 1.58 mm)
+nW      @NW@;     // cells in each 12.5 mm wall band (graded 2.5; 0.63 mm at the wall at scale 1)
 gW      2.5;
 gWr     0.4;
-nC      20;     // 25 mm window band, uniform 1.25 mm
+nC      @NC@;     // 25 mm window band, uniform
 
 vertices
 (''')
@@ -96,4 +103,5 @@ for s in range(3):
         w(f'            ({v(s,j,3)} {v(s+1,j,3)} {v(s+1,j+1,3)} {v(s,j+1,3)})')
     w('        );\n    }')
 w(');\n\n// ************************************************************************* //')
-open(sys.argv[1] if len(sys.argv) > 1 else 'blockMeshDict', 'w').write('\n'.join(out) + '\n')
+open(sys.argv[1] if len(sys.argv) > 1 else 'blockMeshDict', 'w').write(
+    '\n'.join(out).replace('@NW@', str(n(12))).replace('@NC@', str(n(20))) + '\n')

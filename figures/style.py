@@ -89,7 +89,7 @@ def colorbar(fig, mappable, cax, label, ticks=None, orientation='horizontal', fm
     return cb
 
 
-def channel(ax, h=50.0, faces=True, window=True, xlabel=True, ylabel=r'$z$ (mm)'):
+def channel(ax, h=50.0, faces=True, window=True, xlabel=True, ylabel=r'$y$ (mm)'):
     """Axes of a side view of the channel: x 0-275 mm, porous faces dashed, window marked at x = 0."""
     ax.set_xlim(0, 275); ax.set_ylim(0, h); ax.set_aspect('equal')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(25))
@@ -119,10 +119,11 @@ def nice_levels(lo, hi, step):
     return np.arange(np.ceil(lo / step) * step, hi + 0.5 * step, step)
 
 
-def save(fig, name):
+def save(fig, name, bbox=None):
+    """PDF (tight bounding box, or the given one in inches) and a 300 dpi PNG preview."""
     os.makedirs(OUT, exist_ok=True)
     pdf = os.path.join(OUT, name + '.pdf')
-    fig.savefig(pdf)
+    fig.savefig(pdf, **({'bbox_inches': bbox} if bbox is not None else {}))
     plt.close(fig)
     subprocess.run(['pdftoppm', '-r', '300', '-png', '-singlefile', pdf, os.path.join(OUT, name)], check=True)
     return pdf

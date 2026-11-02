@@ -18,10 +18,10 @@ FoamFile
 
 scale 0.001;
 
-nW      12;     // cells in each 12.5 mm wall band (0.63 mm at the wall -> 1.58 mm)
+nW      12;     // cells in each 12.5 mm wall band (graded 2.5; 0.63 mm at the wall at scale 1)
 gW      2.5;
 gWr     0.4;
-nC      20;     // 25 mm window band, uniform 1.25 mm
+nC      20;     // 25 mm window band, uniform
 
 vertices
 (

@@ -69,7 +69,7 @@ def fig04():
             if x0 <= x <= x1:
                 ax.axvline(x, color=S.SERIES[1], lw=0.9 if ax is not top else 0.6)
         ax.set_xlim(x0, x1); ax.set_ylim(z0, z1)
-        ax.set_xlabel(r'$x$ (mm)'); ax.set_ylabel(r'$z$ (mm)')
+        ax.set_xlabel(r'$x$ (mm)'); ax.set_ylabel(r'$y$ (mm)')
     top.set_aspect('equal')
     top.xaxis.set_major_locator(ticker.MultipleLocator(25)); top.yaxis.set_major_locator(ticker.MultipleLocator(25))
     top.set_xlabel(r'$x$ (mm)', labelpad=1)
@@ -237,7 +237,7 @@ def _face_panel(Y, Z, V, norm, levels, name, cbar, w=0.45 * W):
     ax.set_xlim(0, 50); ax.set_ylim(0, 50); ax.set_aspect('equal')
     for a in (ax.xaxis, ax.yaxis):
         a.set_major_locator(ticker.MultipleLocator(10)); a.set_minor_locator(ticker.MultipleLocator(5))
-    ax.set_xlabel(r'$y$ (mm)'); ax.set_ylabel(r'$z$ (mm)')
+    ax.set_xlabel(r'$z$ (mm)'); ax.set_ylabel(r'$y$ (mm)')
     if cbar:
         cax = fig.add_axes([(0.40 + side + 0.08) / w, ax.get_position().y0, 0.07 / w, ax.get_position().height])
         span = norm.vmax - norm.vmin
@@ -371,7 +371,10 @@ def fig13():
                 o = np.argsort(pore['x_mm_from_inlet'][m])
                 x, T = pore['x_mm_from_inlet'][m][o], pore['T_K'][m][o]
                 group.append((x, T)); top = max(top, T.max())
-                ax.plot(x, T, color=S.SERIES[1], ls=S.LINESTYLES[1], lw=1.1, label='pore scale')
+                pts = np.where(np.isin(np.round(x, 1), [25, 50] + list(range(75, 130, 5)) + [150, 175, 200, 225, 250, 275]))[0]
+                # markers on paper 1's stations, the same on every curve (its vertices; one is hidden under another curve)
+                ax.plot(x, T, color=S.SERIES[1], ls=S.LINESTYLES[1], lw=1.0, marker='o', markevery=list(pts), ms=2.6,
+                        mfc='white', mec=S.SERIES[1], mew=0.8, label='pore scale')
         if D.available(G, 300):
             x, T = bulk_profile(G, 300)
             group.append((x, T)); top = max(top, T.max())
@@ -397,23 +400,31 @@ def fig14():
     panels = [('fig14a_wall_total_heat_flux', [(r, X, Y, -1e-3 * V) for r, X, Y, V in D.top_wall(G, Re, 'wallHeatFlux')],
                r'$q_w$ (kW\,m$^{-2}$)', 20),
               ('fig14b_wall_radiative_flux', [(r, X, Y, 1e-3 * V) for r, X, Y, V in D.top_wall(G, Re, 'qr')],
-               r'$q_r$ (kW\,m$^{-2}$)', 20),
+               r'$q_{rad,w}$ (kW\,m$^{-2}$)', 20),
               ('fig14c_wall_temperature', D.top_wall(G, Re, 'T'), r'$T$ (K)', 50)]
+    flux = [b for _, blocks, _, _ in panels[:2] for b in blocks]          # (a) and (b): one colour scale
+    rng = {name: (min(np.nanmin(b[3]) for b in (flux if k < 2 else blocks)), max(np.nanmax(b[3]) for b in (flux if k < 2 else blocks)))
+           for k, (name, blocks, _, _) in enumerate(panels)}
+    figs = []
     for name, blocks, label, step in panels:
-        lo = np.floor(min(np.nanmin(b[3]) for b in blocks) / step) * step
-        hi = np.ceil(max(np.nanmax(b[3]) for b in blocks) / step) * step
+        lo = np.floor(rng[name][0] / step) * step
+        hi = np.ceil(rng[name][1] / step) * step
         norm = Normalize(lo, hi)
         fig, ax, cax = strip_axes(cbar=True)
         for r, X, Y, V in blocks:
             m = S.field(ax, X, Y, V, norm, levels=[v for v in S.nice_levels(lo + step, hi, step) if abs(v) > 1e-9])
             if lo < 0 < hi:                                  # where the wall turns from gaining to losing
                 ax.contour(X, Y, V, levels=[0.0], colors='k', linewidths=0.8, linestyles=(0, (4, 2)))
-        S.channel(ax, window=False, ylabel=r'$y$ (mm)', xlabel=name.endswith('temperature'))
+        S.channel(ax, window=False, ylabel=r'$z$ (mm)', xlabel=name.endswith('temperature'))
         span = hi - lo
         tick = next(s for s in (10, 20, 25, 50, 100, 200, 250, 500) if span / s <= 6)
         S.colorbar(fig, m, cax, label, orientation='vertical', fmt=S.int_formatter(), ticks=ticker.MultipleLocator(tick),
                    minor=ticker.MultipleLocator(tick / 2))
-        S.save(fig, name)
+        figs.append((name, fig))
+    from matplotlib.transforms import Bbox                     # same canvas for the three stacked panels
+    box = Bbox.union([f.get_tightbbox(f.canvas.get_renderer()) for _, f in figs]).padded(0.02)
+    for name, fig in figs:
+        S.save(fig, name, bbox=box)
     for old in ('fig14a_wall_radiative_flux', 'fig14b_wall_temperature'):      # previous two-panel layout
         for ext in ('.pdf', '.png'):
             p = os.path.join(S.OUT, old + ext)

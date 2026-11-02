@@ -79,8 +79,8 @@ by the scripts, see *Running*).
 - **OpenFOAM-v2206** (openfoam.com, stock release) with Scotch and MPI. The coded boundary conditions
   are compiled at run time (`wmake` must work). Other versions may need changes to the coded
   boundary conditions and function objects.
-- **Python 3.8+** with numpy; matplotlib for the figures and for `fieldDiff.py`, `paperTargets.py`
-  and `symmetryCheck.py`; scipy for `symmetryCheck.py`.
+- **Python 3.8+** with numpy; matplotlib for the figures and for `fieldDiff.py` and
+  `symmetryCheck.py`; scipy for `symmetryCheck.py`.
 - **For the figures:** `latex`/`pdflatex` with type1cm, type1ec, cm-super, geometry, underscore,
   amsmath, booktabs, float and graphicx (e.g. texlive-latex-extra, texlive-fonts-recommended,
   cm-super; dvipng is not needed), and `pdftoppm` (poppler), which makes the PNGs. If `latex` is not
@@ -110,8 +110,8 @@ nohup $VSR/case/scripts/stopWhenConverged.sh > log.stopper 2>&1 &   # end each r
 
 Other settings of `Allrun.matrix`: `END` (6000, iterations for a new Re), `ENDG` (8000, for a new G),
 `ENDCOLD` (8000, the first case) and `NPHI`/`NTHETA` (6/11). `stopWhenConverged.sh` ends a run when
-the global residual stays below `TOL` % of the beam (default 0.02; every case below
-ended under it); it stops by itself when the matrix ends.
+the global residual stays below `TOL` % of the beam (default 0.02; every case of the results
+table below ended under it); it stops by itself when the matrix ends.
 
 **One case by hand:**
 
@@ -127,9 +127,12 @@ mkdir split_Re300_6x11 && cp $VSR/case/scripts/Allrun.split split_Re300_6x11/
 # 3. heat transfer, once per (G, Re): G and alpha_eff = 1e6 45 | 5e6 60 | 1e7 66
 cp -r $VSR/case/cht G5e6_Re300_6x11 && cp $VSR/case/scripts/Allrun.cht $VSR/case/scripts/Allpost G5e6_Re300_6x11/
 (cd G5e6_Re300_6x11 && ./Allrun.cht ../split_Re300_6x11 5e6 60)
-#    from a neighbouring solution (WARM is relative to the new case directory), e.g.
-#      sed -i 's/^endTime .*/endTime 4000;/' G1e6_Re300_6x11/system/controlDict
-#      (cd G1e6_Re300_6x11 && WARM=../G5e6_Re300_6x11/8000 ./Allrun.cht ../split_Re300_6x11 1e6 45)
+#    from a neighbouring solution on the same mesh (WARM is relative to the new case directory, <t>
+#    is that run's last reconstructed time), e.g. a new Re at the same G:
+#      (cd G5e6_Re600_6x11 && WARM=../G5e6_Re300_6x11/<t> ./Allrun.cht ../split_Re600_6x11 5e6 60)
+#    A new Re converges in about 4000 iterations, a new G in about 8000 (G 1e6 from G 5e6): leave
+#    endTime at 8000 and end the run with stopWhenConverged.sh, run in the parent directory while the
+#    case runs (kill it afterwards), or watch the energyAudit residual (Checks) and lower endTime.
 #    SMOKE=1 ./Allrun.cht ...              throw-away test: 5 iterations
 
 # 4. un-rotated copy for post-processing, axial profiles (where the figure scripts read them), checks
@@ -143,8 +146,8 @@ python3 $VSR/tools/negativeRays.py G5e6_Re300_6x11 <time>
 The templates decompose into 14 ranks; for another number set it in every decomposeParDict:
 `sed -i "s/^numberOfSubdomains .*/numberOfSubdomains 8;/" <case>/system/decomposeParDict <case>/system/*/decomposeParDict`.
 Wall-clock times on 14 ranks (Intel i7-14700): flow 4 min per Re; split under a minute; heat
-transfer 0.38 s per iteration, i.e. 50 min for 8000 iterations from 300 K and 25 min for 4000 from a
-neighbouring solution. In `Allrun.matrix` (two jobs of 10 ranks) 35-50 min per case and about 90 min
+transfer 0.38 s per iteration, i.e. 50 min for 8000 iterations from 300 K and 25-50 min for 4000-8000
+from a neighbouring solution. In `Allrun.matrix` (two jobs of 10 ranks) 35-50 min per case and about 90 min
 for G 1e6 / Re 300; the whole matrix about 4.5 h.
 
 ## Checks
@@ -164,22 +167,24 @@ Every 100 iterations the `energyAudit` function object prints the energy and mas
 | `Solving for Ux` / `p_rgh` in the heat-transfer log | never (flow frozen) |
 | `tools/negativeRays.py` | no negative ray intensity |
 | `tools/symmetryCheck.py 6x11=<case>/post:<time>` | y- and z-mirror parts < 0.2 K rms (odd nTheta) |
-| `log.drift` (`Allrun.matrix`; or `tools/drift.py <case> <t0> <t1>`) | well under 1 K over the last write interval |
+| `log.drift` (`Allrun.matrix`; or `tools/drift.py <case> <t0> <t1>`, after `reconstructPar -allRegions -time <t0> -fields '(T qr)'` in the case) | well under 1 K over the last write interval |
 
 ## Results
 
 Outlet bulk temperature of the nine cases (ray set 6x11) against the pore-scale model; deviation
 = (T_pore - T)/T_pore; efficiency = m_dot c_p (T_out - 300 K)/(G A_window), the share of the beam
 carried away by the air. Every case passes the checks above (no clipping, no negative intensity,
-energy closure better than 0.1 % of the beam, temperature drift < 0.6 K over the last 1000
-iterations).
+energy closure better than 0.03 % of the beam, temperature drift < 0.3 K over the last 1000
+iterations). The closure is that of `energyBalance.py`, which books the air by its convective
+enthalpy only; it includes the 0.3-1.3 W conducted from the air into the 300 K inlet plane, which
+the in-run `energyAudit` books (its final residual is below 0.02 % in every case).
 
 | G (W/m2) | Re | Outlet bulk T, this case | Pore scale | Deviation | Efficiency (this case / pore scale) | Energy closure |
 |---|---|---|---|---|---|---|
 | 1e6 | 300 | 699 K | 712 K | +1.8 % | 21.0 % / 21.7 % | +0.007 % |
 | 1e6 | 600 | 688 K | 679 K | -1.2 % | 40.8 % / 39.9 % | -0.004 % |
 | 1e6 | 900 | 651 K | 639 K | -1.8 % | 55.4 % / 53.6 % | -0.005 % |
-| 5e6 | 300 | 993 K | 1019 K | +2.5 % | 7.3 % / 7.6 % | +0.067 % |
+| 5e6 | 300 | 994 K | 1019 K | +2.5 % | 7.3 % / 7.6 % | +0.027 % |
 | 5e6 | 600 | 1042 K | 1038 K | -0.4 % | 15.6 % / 15.5 % | +0.015 % |
 | 5e6 | 900 | 1053 K | 1041 K | -1.1 % | 23.8 % / 23.4 % | +0.010 % |
 | 1e7 | 300 | 1135 K | 1171 K | +3.1 % | 4.4 % / 4.6 % | +0.020 % |
@@ -194,15 +199,30 @@ Pressure drop across the porous zone: 7.5, 23.7 and 48.6 Pa at Re = 300, 600 and
 export VSR_RUNS=$VSR/runs          # the run directory of Allrun.matrix
 cd $VSR/figures
 python3 make_figures.py all        # figures/out/figNN_*.pdf/.png, the paper's file names
-python3 tables.py                  # Table 4, and Table 3 if the angular-study runs exist (below)
+python3 tables.py                  # Table 4, and Table 3 if its runs exist (below)
 python3 make_proof.py              # figures/out/figures_proof.pdf: all figures and tables at the paper's sizes
 ```
 
-Table 3 (angular sensitivity) needs the runs `G5e6_Re300_6x10`, `G5e6_Re300_12x10` and
+Table 3(b) (angular sensitivity) needs the runs `G5e6_Re300_6x10`, `G5e6_Re300_12x10` and
 `G5e6_Re300_8x15` next to `G5e6_Re300_6x11`: repeat steps 2-4 of *One case by hand* at G 5e6 /
 Re 300 with `nPhi nTheta` = `6 10`, `12 10` and `8 15` (the two even sets print the sink-ray warning,
 which is what the table shows). `tables.py` reads the outlet and face temperatures from their
-function objects and the wall maximum from `post/`, and says which runs are missing.
+function objects, the peak bulk temperature from `figures/bulk_faces_<time>.csv` and the wall
+maximum from `post/`, and says which runs are missing.
+
+Table 3(a) (mesh study) needs the coarse and fine meshes in `$VSR_RUNS/studies/mesh_coarse` and
+`$VSR_RUNS/studies/mesh_fine`, each with its own flow, split and G 5e6 / Re 300 run from 300 K:
+
+```sh
+cd $VSR_RUNS && mkdir -p studies/mesh_fine && cd studies/mesh_fine       # mesh_coarse: scale 0.75
+cp -r $VSR/case/flow flow_Re300 && cp $VSR/case/scripts/Allrun.flow flow_Re300/
+python3 $VSR/case/scripts/genBlockMeshDict.py flow_Re300/system/blockMeshDict 1.25
+# then steps 1-4 of *One case by hand* in this directory (flow_Re300, split_Re300_6x11, G5e6_Re300_6x11)
+```
+
+Its cost column comes from `studies/log.timing`: the three meshes continued for 150 iterations on
+14 ranks back to back (lines `coarse|base|fine <t> s/it`, the mean over the last 100 iterations),
+scaled to the adopted mesh's own cost; without it the coarse and fine costs are left blank.
 
 Fig 13 compares with the pore-scale bulk temperatures, digitised from the pore-scale paper's Fig 13
 (`figures/data/pore_scale_bulkT_digitised.csv`: outlet values within 0.8 K of that paper's table,
@@ -215,12 +235,11 @@ about +-1 K on the gentle parts and +-5-15 K on the steep rise at the front face
 | `beamAlign.py` | fvDOM ordinate set, beam ordinate, rotation for `transformPoints`, boundary sink rays |
 | `angularCheck.py` | hemispherical weight error of fvDOM's diffuse emission on each boundary orientation of the rotated channel, for any (nPhi, nTheta) |
 | `profiles.py` | axial profiles per cell layer: bulk, mean, min, max and centreline temperature, wall temperature and absorbed radiation |
-| `bulkFaces.py` | bulk temperature on every face plane from the face mass fluxes, inlet to outlet (Figs 12-13); its outlet value is that of the energy balance |
+| `bulkFaces.py` | bulk temperature on every face plane, inlet to outlet (Figs 12-13): the solver's face mass fluxes with the face values of its convection scheme, so every plane is the convective enthalpy flux of the solver; its outlet value is that of the energy balance |
 | `negativeRays.py <case> <time>` | minimum of every ray intensity field (the case itself, not `post/`) |
 | `symmetryCheck.py [--figure f.png] label=<case>/post:<time> ...` | angular error from the departure from the square symmetry of the case |
 | `fieldDiff.py <caseA>/post:<t> <caseB>/post:<t>` | cell-by-cell and face-by-face difference of two runs on the same mesh |
 | `drift.py <case> <t0> <t1>` | change of T between two write times (convergence) |
-| `paperTargets.py` | G 5e6 / Re 300 run against the values reported in the papers |
 | `contours.py`, `foamio.py` | plotting and a minimal ASCII OpenFOAM reader used by the others |
 
 ## Citation
