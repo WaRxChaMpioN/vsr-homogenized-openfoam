@@ -2,7 +2,7 @@
 # Ends heat-transfer runs once converged instead of at a fixed endTime: when the last two
 # 'energyAudit global' residuals (every 100 iterations) are both below TOL % of the beam and at least
 # MIN iterations are done, endTime is set to the next write time (runTimeModifiable re-reads
-# controlDict). The drift check that Allrun.matrix does after each run then confirms convergence.
+# controlDict). Allrun.matrix then writes the drift of T over the last write interval (log.drift).
 # Run in the run directory of Allrun.matrix; it stops when the matrix has finished:
 #   $VSR/case/scripts/stopWhenConverged.sh > log.stopper 2>&1 &     (TOL=0.02 MIN=3000 by default)
 TOL=${TOL:-0.02}; MIN=${MIN:-3000}
@@ -25,6 +25,7 @@ do
         fi
     done
     grep -q 'matrix finished' log.matrix 2>/dev/null && break
+    [ -f log.matrix ] && ! pgrep -f 'Allrun.matrix' > /dev/null && break        # matrix stopped early
     sleep 60
 done
 echo "$(date '+%F %T') matrix finished, stopper done"

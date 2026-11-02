@@ -14,7 +14,7 @@
      E      = (c1 eps1 + c2 eps2) sigma
      c      = sum over the rays LEAVING the face on that side of (-n.dAve)/pi, computed from that
               region's own fvDOM rays and its own patch normals (same test and weight as
-              greyDiffusive, lines 212 and 336-351); 0.99460 on these faces for 6 x 10
+              greyDiffusive, lines 212 and 336-351); 0.99145 (cos 7.5 deg) on these faces for 6 x 11
      eps    = emissivity of that side from constant/<region>/boundaryRadiationProperties, i.e.
               exactly the value the greyDiffusive rays use (line 186-191)
   With c and eps taken from the radiation model itself, Qabs - E Tf^4 equals fvDOM's

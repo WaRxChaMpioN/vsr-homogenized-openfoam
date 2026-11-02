@@ -11,7 +11,7 @@ FoamFile { version 2.0; format ascii; class dictionary; object fvOptions; }
 //   d = 1/K = 3.2468e7 1/m2,  f = 2 c_F/sqrt(K) = 1.2536e4 1/m
 // OpenFOAM applies -(mu d + 0.5 rho |U| f) U (DarcyForchheimer.C). Isotropic, so the
 // coordinate system and the beam rotation do not matter.
-// Zone = the WHOLE porousRegion cellZone from blockMesh (x = 75-125 mm, 46,464 cells);
+// Zone = the WHOLE porousRegion cellZone from blockMesh (x = 75-125 mm, 58,080 cells);
 // no topoSet box, no overlapping zone (splitMeshRegions -cellZonesOnly forbids a cell in
 // two zones).
 porosity

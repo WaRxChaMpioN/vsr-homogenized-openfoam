@@ -23,7 +23,7 @@ the faces normal to the axis get such rays. With nTheta ODD the beam ray is on t
 the rotation is about z only, every boundary normal is horizontal or vertical, and
 sign(n.d) == sign(n.dAve) for every ray: no sinks. Use an odd nTheta.
 
-Usage:  beamAlign.py <nPhi> <nTheta>          or   beamAlign.py <radiationProperties file>
+Usage:  beamAlign.py <nPhi> <nTheta>          or   beamAlign.py <file with nPhi/nTheta, e.g. system/caseParameters>
         add --shell to print only shell variable assignments (used by Allrun)
 """
 import math, re, sys

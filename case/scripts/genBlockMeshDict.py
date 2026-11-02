@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write the single-region blockMeshDict (one mesh for the whole channel, three cellZones).
 
-Cross-section: the 3x3 blocks of the reduced case (system/meshParameters: nW 12, gW 2.5, nC 20),
+Cross-section: 3x3 blocks, 12 cells graded 2.5 in each 12.5 mm wall band, 20 uniform cells over the window band,
 window edges at 12.5/37.5 mm on block faces.
 Axial:  inletRegion  x =   0- 75 mm, 48 cells, multi-graded 3.49 -> 1.0 mm (0-70) and 1.0 -> 0.081 mm (70-75)
         porousRegion x =  75-125 mm, 30 cells, 0.61 -> 3.45 -> 0.61 mm (graded towards BOTH faces)

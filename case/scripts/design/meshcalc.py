@@ -14,7 +14,7 @@ def multi(L, nDiv, secs):
     return out
 if __name__ == '__main__':
     inlet = multi(75.0, 48, [(70/75, 35/48, 1/3.5), (5/75, 13/48, 0.08)])
-    porous = section_sizes(50.0, 24, 8.0)
+    porous = multi(50.0, 30, [(0.5, 0.5, 5.6535), (0.5, 0.5, 1 / 5.6535)])
     exitz = section_sizes(150.0, 30, 4.0)
     for name, s in [('inlet', inlet), ('porous', porous), ('exit', exitz)]:
         print(f"{name:7s} n={len(s):3d} sum={sum(s):8.4f} mm first={s[0]:.4f} last={s[-1]:.4f} max ratio={max(max(a/b,b/a) for a,b in zip(s,s[1:])):.3f}")

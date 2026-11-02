@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Figures of paper 2 from the corrected model (6x11 rays), as drop-in replacements for the files in
-the manuscript's figures/ folder (same base names; PDF + PNG in out/):
+Figures of paper 2 from the runs (6x11 rays), named as the files in the manuscript's figures/
+folder (PDF + PNG in out/):
 
     make_figures.py [fig04 fig05 ... | all]
 
@@ -369,7 +369,7 @@ def fig13():
                 o = np.argsort(pore['x_mm_from_inlet'][m])
                 x, T = pore['x_mm_from_inlet'][m][o], pore['T_K'][m][o]
                 group.append((x, T)); top = max(top, T.max())
-                ax.plot(x, T, color=S.SERIES[1], ls=S.LINESTYLES[1], lw=1.1, label='pore scale (paper 1)')
+                ax.plot(x, T, color=S.SERIES[1], ls=S.LINESTYLES[1], lw=1.1, label='pore scale')
         if D.available(G, 300):
             x, T = bulk_profile(G, 300)
             group.append((x, T)); top = max(top, T.max())
@@ -423,6 +423,13 @@ FIGS = {f'fig{n:02d}': globals()[f'fig{n:02d}'] for n in (4, 5, 6, 7, 8, 9, 10, 
 
 if __name__ == '__main__':
     todo = sys.argv[1:] or ['all']
+    failed = []
     for k in (FIGS if todo == ['all'] else todo):
         print('making', k, flush=True)
-        FIGS[k]()
+        try:
+            FIGS[k]()
+        except Exception as e:                          # one missing input must not stop the others
+            failed.append(k)
+            print(f'  {k} FAILED: {type(e).__name__}: {e}', flush=True)
+    if failed:
+        sys.exit('failed: ' + ' '.join(failed))

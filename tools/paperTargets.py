@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare a corrected-model run (cases/corrected/<case>) with the paper-2 targets for G 5e6, Re 300:
+Compare a run (runs/<case>) with the values reported in the papers for G 5e6, Re 300:
 
     paperTargets.py <case> <time> <profiles.csv> [figure.png]
 
@@ -70,8 +70,8 @@ def main():
     # front / back face temperatures (patch values of the opaque faces)
     geo = patch_geometry(f'{post}/constant/porousRegion/polyMesh')
     Tb = read_field(f'{post}/{t}/porousRegion/T')[1]
-    for name, patch, target, note in [('Front face max T [K]', 'porousRegion_to_inletRegion', 2250, 'text l.549, Fig 8a ~2300'),
-                                      ('Back face max T [K]', 'porousRegion_to_exitRegion', 1040, 'Fig 11b core, loose (C2, C7)')]:
+    for name, patch, target, note in [('Front face max T [K]', 'porousRegion_to_inletRegion', 2250, 'text, Fig 8a ~2300'),
+                                      ('Back face max T [K]', 'porousRegion_to_exitRegion', 1040, 'Fig 11b core')]:
         rows.append((name, target, float(np.max(Tb[patch])), note))
 
     # bulk profile
@@ -94,14 +94,14 @@ def main():
         o = np.argsort(xs[c])
         figure(prof, xs[c][o], Ts[c][o], os.path.basename(os.path.abspath(case)), sys.argv[4])
     i = np.argmax(Ts)
-    rows.append(('Top wall max T [K]', 1400, Ts[i], f'Fig 14b, at x ~ 85-87 mm (model: {xs[i]:.1f} mm); implies air conductivity (C9)'))
+    rows.append(('Top wall max T [K]', 1400, Ts[i], f'Fig 14b, at x ~ 85-87 mm (model: {xs[i]:.1f} mm)'))
     for name, a, b, target in [('inlet', 0, 75, 660), ('porous', 75, 125, 1040), ('exit', 125, 275, 490)]:
         m = (xs > a) & (xs < b)
         rows.append((f'Top wall mean T, {name} section [K]', target, Ts[m].mean(), 'Fig 14b pixel mean, loose'))
 
     # upstream wall heating: radiation absorbed by the inlet-section walls
     rows.append(('Inlet-wall radiation absorbed [W]', None, last_value(case, 'inletRegion', 'Qr_inletWall'),
-                 'old fine run 146 W, old coarse runs 410-526 W'))
+                 ''))
 
     w = max(len(r[0]) for r in rows)
     print(f'{"quantity":{w}s}  {"paper 2":>8s}  {"model":>8s}  {"diff":>7s}   note')

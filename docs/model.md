@@ -21,7 +21,7 @@ fix adopted here.
 | Boundary | Temperature | Radiation |
 |---|---|---|
 | Inlet plane (inlet and window) | 300 K | grey, eps = 0.92 at 300 K; the window adds the beam G to the beam ordinate (`qRadExt`, `qRadExtDir`) |
-| Channel walls | `radiativeWallT`: k (Tc - Tw)/delta + q_abs = h (Tw - T_inf) + eps sigma (Tw^4 - T_inf^4), h = 5 W/m2K, eps = 0.92, T_inf = 300 K | grey, eps = 0.92 |
+| Channel walls | `radiativeWallT`: k (Tc - Tw)/delta + q_abs - c eps sigma Tw^4 = h (Tw - T_inf) + eps sigma (Tw^4 - T_inf^4), h = 5 W/m2K, eps = 0.92, T_inf = 300 K (absorbed radiation, emission into the channel with fvDOM's weights c, loss to the surroundings) | grey, eps = 0.92 |
 | Front and back faces of the porous zone (both sides) | `radiativeInterfaceT` (face balance above) | grey, eps = 0.92, opaque |
 | Outlet | zero gradient | black at 300 K (open to the surroundings) |
 
@@ -38,7 +38,7 @@ mm at the wall; 20 uniform cells over the 25 mm window band).
 | porousRegion | 75-125 | 30 | 0.61 mm at both faces, 3.45 mm in the middle |
 | exitRegion | 125-275 | 30 | 2.3 mm to 9.2 mm |
 
-`case/scripts/genBlockMeshDict.py` writes `case/flow/system/blockMeshDict`;
+`python3 case/scripts/genBlockMeshDict.py case/flow/system/blockMeshDict` writes the mesh dictionary;
 `case/scripts/design/meshcalc.py` and `outflow_face_1d.py` document the grading and the Peclet
 criterion.
 
@@ -56,9 +56,9 @@ criterion.
 4. `Allpost`: an un-rotated copy (`post/`) for post-processing.
 
 With 0.7 in the porous zone, its temperature level (a nearly Neumann problem with high
-conductivity) is the slowest mode; at G = 1e6, where the radiative coupling (~T^3) is weak, the
-residual fell only about 27 % per 500 iterations. 0.9 makes it about three times faster; the converged
-solution does not depend on it.
+conductivity) is the slowest mode; at G = 1e6 / Re = 300, where the radiative coupling (~T^3) is
+weak, the global residual fell about 25 % per 500 iterations with 0.7 and about 50 % with 0.9. The
+converged solution does not depend on it.
 
 ## Checks
 
@@ -71,16 +71,16 @@ See the README. The energy books (`system/balanceFunctions`, `system/auditFuncti
 |---|---|---|---|---|
 | Ordinates | 240 | 480 | 264 | 480 |
 | Cost per iteration, 14 cores | 0.31 s | 1.08 s | 0.38 s | 1.12 s |
-| Beam ordinate theta / channel tilt | 81 / 9 deg | 81 / 9 deg | 90 / 0 deg | 90 / 0 deg |
+| Beam ordinate theta / axis elevation out of the horizontal | 81 / 9 deg | 81 / 9 deg | 90 / 0 deg | 90 / 0 deg |
 | Ordinates with negative intensity (minimum) | 8 (-7,982 kW/m2/sr) | 18 (-9,036 kW/m2/sr) | 0 | 0 |
 | Outlet bulk T | 993.1 K | 993.3 K | 993.4 K | 993.1 K |
-| Front / back face maximum T | 2291 / 1218 K | 2290 / 1218 K | 2292 / 1218 K | 2291 / 1218 K |
+| Front / back face maximum T | 2291 / 1217 K | 2290 / 1218 K | 2292 / 1218 K | 2291 / 1218 K |
 | Inlet-wall T, departure from the square symmetry (rms) | 11.4 K | 8.4 K | 8.9 K | 4.9 K |
 
 - Bulk, face and porous-zone temperatures do not depend on the ray set (within 2 K), nor do the heat
   flows (within 2.5 W, 0.08 % of the beam).
 - Wall temperatures carry a ray effect, a patchy redistribution of the same absorbed heat: about
-  +-10-17 K rms on the inlet walls, larger within 5 mm of the front face, 3-5 K on the exit walls,
+  8-17 K rms on the inlet walls, larger within 5 mm of the front face, 3-5 K on the exit walls,
   < 0.5 K on the porous walls. Use 8x15 when local wall temperatures next to the front face matter.
 - The case is symmetric under the 8 reflections and quarter turns of the square cross-section; the
   ordinate set is not, so the departure from that symmetry measures the angular error
@@ -91,8 +91,8 @@ See the README. The energy books (`system/balanceFunctions`, `system/auditFuncti
 
 - `foamDictionary -set` on `controlDict` writes it back with every `#include` expanded; later edits
   to the included files are then ignored. Edit `controlDict` with `sed`.
-- Coded function objects: `codeExecute` is not part of the dynamic-code digest. After editing it,
-  delete `dynamicCode/<name>` and its library, or the old library is reused silently.
+- If an edit to a coded function object has no effect, check that `controlDict` still `#include`s
+  the file (see the note above); deleting `dynamicCode/<name>` forces a rebuild.
 - A top-level `constant/g` is required even though every region has its own.
 - fvDOM: `greyDiffusiveRadiationMixed` classifies an ordinate at a boundary by its direction d
   (`(-n & d) > 0`: emitted, fixed value) while transporting it with `dAve & Sf`. Where the two

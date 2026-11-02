@@ -14,7 +14,7 @@ DESIGN=${DESIGN:-${VSR:?set VSR to the repository root}/case}
 FLOW=${1:?flowCase}; NPHI=${2:?nPhi}; NTHETA=${3:?nTheta}
 #------------------------------------------------------------------------------
 time=$(cat "$FLOW"/FLOW_TIME)
-[ -d "$FLOW/$time" ] || { echo "no reconstructed time $time in $FLOW"; exit 1; }
+[ -n "$time" ] && [ -d "$FLOW/$time" ] || { echo "no reconstructed flow time in $FLOW (FLOW_TIME: '$time')"; exit 1; }
 cp -r "$FLOW"/system "$FLOW"/constant .
 cp -r "$FLOW"/"$time" .
 

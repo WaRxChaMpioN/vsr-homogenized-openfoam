@@ -31,6 +31,8 @@ def main():
     bad = 0
     for r in REGIONS:
         files = sorted(glob.glob(f'{case}/{t}/{r}/ILambda_*_0'), key=lambda p: int(p.split('_')[-2]))
+        if not files:
+            sys.exit(f'{case}/{t}/{r}: no ILambda_*_0 fields (give the case itself and a fully reconstructed time, not post/)')
         neg, lo = [], (np.inf, None)
         for f in files:
             v = internal(f)

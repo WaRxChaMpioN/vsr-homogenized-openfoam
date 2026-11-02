@@ -10,7 +10,7 @@
 #    finished case (same mesh, so T is copied cell by cell): a new G gets ENDG iterations, a new Re
 #    at the same G gets END.
 # Every finished case is post-processed for the figures: Allpost (un-rotated copy), profiles.py,
-# negativeRays.py, and T/qr of the previous write time for the drift check.
+# negativeRays.py, and the drift of T over the last write interval (log.drift).
 # Finished steps are skipped, so the script can be re-run after an interruption.
 . ${WM_PROJECT_DIR:?source the OpenFOAM-v2206 bashrc first}/bin/tools/RunFunctions
 VSR=${VSR:?set VSR to the repository root}
@@ -62,6 +62,7 @@ cht() {     # G Re warmCase|'' endTime nprocs
         ./Allpost > log.Allpost 2>&1 || exit 1
         t=$(foamListTimes -latestTime -noZero | tail -1)
         reconstructPar -allRegions -time $((t - 1000)) -fields '(T qr)' > log.reconstructPar.prev 2>&1
+        python3 $TOOLS/drift.py . $((t - 1000)) $t > log.drift 2>&1
         mkdir -p figures
         python3 $TOOLS/profiles.py post $t figures/profiles_$t.csv > log.profiles 2>&1
         python3 $TOOLS/negativeRays.py . $t > log.negativeRays 2>&1

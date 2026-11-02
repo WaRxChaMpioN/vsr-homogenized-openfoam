@@ -22,7 +22,8 @@ from matplotlib.colors import LinearSegmentedColormap, Normalize, LogNorm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'out')
-os.environ['PATH'] = os.path.expanduser('~/.local/bin') + os.pathsep + os.environ.get('PATH', '')   # TinyTeX
+if os.environ.get('VSR_TEX_BIN'):                       # LaTeX not on PATH: e.g. VSR_TEX_BIN=~/.local/bin (TinyTeX)
+    os.environ['PATH'] = os.path.expanduser(os.environ['VSR_TEX_BIN']) + os.pathsep + os.environ.get('PATH', '')
 
 LINEWIDTH = 390 / 72.27                                  # in
 RAINBOW = LinearSegmentedColormap.from_list(

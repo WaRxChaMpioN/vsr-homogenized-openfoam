@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Check the arithmetic of radiativeInterfaceT / radiativeWallTc in Python:
-c weights on the rotated 6x10 ray set (as fvDOM builds it), Newton convergence, tangent = root."""
+"""Check the arithmetic of radiativeInterfaceT / radiativeWallT in Python:
+c weights on a rotated ray set (as fvDOM builds it), Newton convergence, tangent = root.
+Written for the 6x10 set used during development; for another set take nPhi, nTheta and the
+rotation from tools/beamAlign.py."""
 import math, numpy as np
 nPhi, nTheta = 6, 10
 dPhi = math.pi/(2*nPhi); dTh = math.pi/nTheta

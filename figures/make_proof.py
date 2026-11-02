@@ -67,7 +67,7 @@ def main():
                 '\\def\\DoNotLoadEpstopdf{}  % epstopdf-base needs grfext, not installed here; no EPS figures\n'
                 '\\usepackage{graphicx,float,booktabs,amsmath}\n'
                 '\\renewcommand{\\cite}[1]{[paper 1]}\n\\setlength{\\parindent}{0pt}\n\\begin{document}\n'
-                '\\section*{Paper 2: figures and tables from the corrected model (proof)}\n'
+                '\\section*{Paper 2: figures and tables (proof)}\n'
                 + '\n'.join(parts) + '\n\\end{document}\n')
     run = subprocess.run(['pdflatex', '-interaction=nonstopmode', 'figures_proof.tex'], cwd=S.OUT, capture_output=True, text=True)
     log = open(os.path.join(S.OUT, 'figures_proof.log')).read()

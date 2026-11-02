@@ -5,12 +5,13 @@ preview (out/tables_preview.pdf / .png):
 
   out/table4_outlet_temperatures.tex   Table 4: outlet bulk temperature, pore scale vs macroscopic,
                                         deviation, and receiver efficiency of both models
-  out/table3_angular_sensitivity.tex   replacement for Table 3: sensitivity of the G 5e6 / Re 300
+  out/table3_angular_sensitivity.tex   Table 3: sensitivity of the G 5e6 / Re 300
                                         results to the angular discretisation (mesh fixed)
 
     tables.py
 """
 import os, re, subprocess
+from decimal import Decimal, ROUND_HALF_UP
 import numpy as np
 import data as D
 import style as S
@@ -19,6 +20,16 @@ T_PORE = {('1e6', 300): 711.9, ('1e6', 600): 679.18, ('1e6', 900): 639.2,       
           ('5e6', 300): 1018.9, ('5e6', 600): 1037.65, ('5e6', 900): 1040.93,    # tab:porous_outlet_temperatures
           ('1e7', 300): 1170.88, ('1e7', 600): 1196.27, ('1e7', 900): 1204.5}
 RHO, CP, A_IN, A_WIN, T_IN = 1.225, 1006.0, 2.5e-3, 6.25e-4, 300.0
+
+
+def r0(v):
+    """Round half up to an integer (format() rounds 1204.5 to the even 1204; the paper prints 1205)."""
+    return f"{Decimal(str(v)).quantize(Decimal('1'), ROUND_HALF_UP)}"
+
+
+def num(v, fmt):
+    """A signed table number in math mode, so that negatives get a minus sign, not a hyphen."""
+    return '$' + format(v, fmt) + '$'
 
 
 def efficiency(G, Re, T_out):
@@ -33,11 +44,11 @@ def table4():
             tp = T_PORE[(G, Re)]
             if D.available(G, Re):
                 tm = D.energy(G, Re)['T_out']
-                cells = [f'{tm:.0f}', f'{100 * (tp - tm) / tp:.1f}', f'{efficiency(G, Re, tp):.1f}', f'{efficiency(G, Re, tm):.1f}']
+                cells = [r0(tm), num(100 * (tp - tm) / tp, '.1f'), f'{efficiency(G, Re, tp):.1f}', f'{efficiency(G, Re, tm):.1f}']
             else:
                 cells = ['--'] * 2 + [f'{efficiency(G, Re, tp):.1f}', '--']
             g = rf'${D.G_LABEL[G]}$' if k == 0 else ''
-            rows.append(f'{g} & {Re} & {tp:.0f} & ' + ' & '.join(cells) + r' \\')
+            rows.append(f'{g} & {Re} & {r0(tp)} & ' + ' & '.join(cells) + r' \\')
         rows.append(r'\addlinespace')
     body = '\n'.join(rows[:-1])
     return rf"""\begin{{table}}[H]
@@ -59,32 +70,54 @@ $G$ (W\,m$^{{-2}}$) & $Re$ & Pore scale & Macroscopic & Dev. (\%) & Pore scale &
 """
 
 
+def _last(c, region, fo):
+    """Last value written by a function object (full precision; latest restart folder)."""
+    import glob
+    d = sorted(glob.glob(os.path.join(c, 'postProcessing', region, fo, '*')), key=lambda p: float(os.path.basename(p)))[-1]
+    rows = [l.split() for l in open(glob.glob(os.path.join(d, '*.dat'))[0]) if l.strip() and not l.startswith('#')]
+    return float(rows[-1][1])
+
+
+def _top_wall_max(c):
+    """Maximum temperature on the top wall (z = 50 mm), from the un-rotated copy post/<t>."""
+    post = os.path.join(c, 'post')
+    t = max((d for d in os.listdir(post) if d.isdigit()), key=int)
+    to_local, best = D.frame(post), 0.0
+    for r, w in D.WALL.items():
+        Cf, _ = D.patch_geometry(f'{post}/constant/{r}/polyMesh')[w]
+        T = np.broadcast_to(D.read_field(f'{post}/{t}/{r}/T')[1][w], len(Cf))
+        best = max(best, float(np.max(T[to_local(Cf)[:, 2] > 49.9])))
+    return best
+
+
 def _ray_case(rays):
+    """Outlet bulk T and front-face maximum (function objects, full precision), top-wall maximum
+    (post/), cost per iteration (log) of the run G5e6_Re300_<rays>."""
     c = os.path.join(D.CASES, f'G5e6_Re300_{rays}')
-    eb = open(os.path.join(c, 'log.energyBalance')).read()
-    T_out = float(re.search(r'bulk T out ([\d.]+) K', eb).group(1))
-    pc = open(os.path.join(c, 'figures', 'paper_comparison.txt')).read()
-    front = float(re.search(r'Front face max T \[K\]\s+\d+\s+([\d.]+)', pc).group(1))
-    top = float(re.search(r'Top wall max T \[K\]\s+\d+\s+([\d.]+)', pc).group(1))
+    T_out = _last(c, 'exitRegion', 'outletBulkT')
+    front = _last(c, 'porousRegion', 'Tmax_porousRegion_to_inletRegion')
     log = open(os.path.join(c, 'log.chtMultiRegionSimpleFoam')).read()
     n = len(re.findall(r'^Time = ', log, re.M))
     secs = float(re.findall(r'^ExecutionTime = ([\d.]+) s', log, re.M)[-1])
-    return T_out, front, top, secs / n
+    return T_out, front, _top_wall_max(c), secs / n
 
 
 def table3():
     sets = [('6x10', 6, 10, 81), ('12x10', 12, 10, 81), ('6x11', 6, 11, 90), ('8x15', 8, 15, 90)]
-    sets = [t for t in sets if os.path.isfile(os.path.join(D.CASES, f'G5e6_Re300_{t[0]}', 'figures', 'paper_comparison.txt'))]
-    if len(sets) < 2 or sets[-1][0] != '8x15':
-        return None                      # needs the 8x15 reference run and at least one other set
+    have = [t for t in sets if os.path.isfile(os.path.join(D.CASES, f'G5e6_Re300_{t[0]}', 'post', 'post.foam'))]
+    if len(have) < 2 or have[-1][0] != '8x15':
+        missing = [f'G5e6_Re300_{t[0]}' for t in sets if t not in have]
+        print('Table 3 skipped: needs the 8x15 run and at least one other ray set; missing (or no post/):', ', '.join(missing))
+        return None
+    sets = have
     vals = {s: _ray_case(s) for s, *_ in sets}
     ref = vals['8x15'][0]
     rows = []
     for s, nphi, nth, th in sets:
         T_out, front, top, cost = vals[s]
         mark = r'$^{\dagger}$' if s == '6x11' else (r'$^{\ast}$' if nth % 2 == 0 else '')
-        dev = '--' if s == '8x15' else f'{100 * (T_out - ref) / ref:+.2f}'
-        rows.append(f'$({nphi}, {nth})${mark} & {4 * nphi * nth} & {th} & {T_out:.1f} & {dev} & {front:.0f} & {top:.0f} & {cost:.2f}' + r' \\')
+        dev = '--' if s == '8x15' else num(100 * (T_out - ref) / ref, '+.2f')
+        rows.append(f'$({nphi}, {nth})${mark} & {4 * nphi * nth} & {th} & {T_out:.1f} & {dev} & {r0(front)} & {r0(top)} & {cost:.2f}' + r' \\')
     body = '\n'.join(rows)
     return rf"""\begin{{table}}[H]
 \centering

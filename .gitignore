@@ -9,6 +9,12 @@ log.*
 *.foam
 *.OpenFOAM
 FLOW_TIME
+polyMesh/
+/case/cht/0/
+/case/*/figures/
+/flow_Re*/
+/split_Re*/
+/G*_Re*_*/
 
 # generated figures and tables
 figures/out/

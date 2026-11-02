@@ -4,11 +4,11 @@
      kappa*delta*(Tc - Tw) + q_rad,w = h (Tw - Ta) + epsOut sigma (Tw^4 - Ta^4)
   with the inside radiation written exactly as fvDOM books it on a greyDiffusive face,
      q_rad,w = (1 - c(1-eps)) qin - c eps sigma Tw^4,
-  c = sum over the rays leaving the wall of (-n.dAve)/pi (0.988-0.992 on these walls for 6x10)
+  c = sum over the rays leaving the wall of (-n.dAve)/pi (0.980-0.991 on these walls for 6x11)
   and eps from constant/<region>/boundaryRadiationProperties (what the rays use), so that
   wall loss = conduction + fvDOM qr exactly. kappa from thermo: kappa_f in the air regions,
   kappa_con in porousRegion. Only qin is explicit; Newton from an upper bound, tangent mixed
-  condition (same method as the case's working system/radiativeWallT).
+  condition (same method as system/radiativeInterfaceT).
   Outside: h = 5 W/m2K, epsOut = 0.92, Ta = 300 K (the same constants are used by energyAudit).
 \*---------------------------------------------------------------------------*/
 

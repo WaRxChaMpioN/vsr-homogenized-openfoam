@@ -195,6 +195,9 @@ def _flow_geometry():
     """Cell centres and patches of the flow mesh (the same block mesh for every Re), in mm."""
     d = FLOW(300)
     t = open(os.path.join(d, 'FLOW_TIME')).read().strip()
+    if not os.path.isfile(f'{d}/{t}/C'):
+        raise FileNotFoundError(f'{d}/{t}/C: run "postProcess -func writeCellCentres -latestTime" in {d} '
+                                '(Allrun.flow does this)')
     C = 1e3 * read_field(f'{d}/{t}/C')[0]
     patches = {p: (1e3 * Cf, np.linalg.norm(Sf, axis=1) * 1e6)
                for p, (Cf, Sf) in patch_geometry(f'{d}/constant/polyMesh').items()}

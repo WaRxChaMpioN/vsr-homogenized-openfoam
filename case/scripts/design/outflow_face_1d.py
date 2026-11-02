@@ -33,7 +33,7 @@ r = 0.4; n = 32; q = r**(1/(n-1)); first = 74.5*(1-q)/(1-q**n); oldmesh = [first
 newmesh = multi(75.0, 48, [(70/75, 35/48, 1/3.5), (5/75, 13/48, 0.08)])
 for Re, U0 in [(300, 0.1068), (900, 0.3204)]:
     U = 1.3*U0
-    for name, m in [('current 32 cells, last 1.4 mm', oldmesh), ('adopted 48 cells, last 0.081 mm', newmesh)]:
+    for name, m in [('old 32 cells, last 1.4 mm', oldmesh), ('adopted 48 cells, last 0.081 mm', newmesh)]:
         T, F = solve(m, U)
         clipE = F*np.clip(300.0 - T, 0, None).max()
         print(f'Re {Re} U_face={U:.3f} {name:34s}: last cells T = ' + ' '.join(f'{t:8.1f}' for t in T[-4:]) +
