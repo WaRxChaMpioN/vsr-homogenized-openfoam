@@ -1,0 +1,51 @@
+cff-version: 1.2.0
+message: "If you use this case or its tools, please cite the article below and this repository."
+title: "vsr-homogenized-openfoam: OpenFOAM case of a homogenized volumetric solar receiver with a TPMS porous absorber"
+type: software
+authors:
+  - family-names: Jha
+    given-names: Kaushal
+    affiliation: "Indian Institute of Technology Mandi"
+repository-code: "https://github.com/WaRxChaMpioN/vsr-homogenized-openfoam"
+license: GPL-3.0-or-later
+version: "1.0.0"
+date-released: "2026-11-01"
+keywords:
+  - OpenFOAM
+  - volumetric solar receiver
+  - porous media
+  - radiative heat transfer
+  - discrete ordinates method
+  - concentrated solar power
+preferred-citation:
+  type: article
+  title: "Effective property modelling of radiative heat transfer in porous media for concentrated solar energy applications"
+  authors:
+    - family-names: Jha
+      given-names: Kaushal
+      affiliation: "Indian Institute of Technology Mandi"
+    - family-names: Rathore
+      given-names: Surendra Singh
+      affiliation: "Indian Institute of Technology Bhilai"
+    - family-names: Mehta
+      given-names: Balkrishna
+      affiliation: "Indian Institute of Technology Bhilai"
+    - family-names: Kumar
+      given-names: Pradeep
+      affiliation: "Indian Institute of Technology Mandi"
+  year: 2026
+  status: submitted
+references:
+  - type: article
+    title: "Role of radiation in a TPMS porous absorber under concentrated irradiation: a pore-scale study and effective properties for homogenized models"
+    authors:
+      - family-names: Jha
+        given-names: Kaushal
+      - family-names: Rathore
+        given-names: Surendra Singh
+      - family-names: Mehta
+        given-names: Balkrishna
+      - family-names: Kumar
+        given-names: Pradeep
+    year: 2026
+    status: submitted

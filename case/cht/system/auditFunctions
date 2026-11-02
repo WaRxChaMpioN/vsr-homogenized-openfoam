@@ -1,0 +1,221 @@
+// Included in system/controlDict functions{} (after balanceFunctions).
+//
+// Tamb: uniform 300 K field for the outlet rays ('T Tamb' in 0/exitRegion/IDefault).
+//   Created in codeRead, i.e. when the function object is constructed at functionObjects.start()
+//   in the first runTime.loop() (Time.C:913; codedFunctionObject.C:229-230 -> template ctor ->
+//   read()), before the first ray solve (EEqn.H:34). Never written, so it cannot go missing on a
+//   restart (instead of a readFields + writeObjects pair).
+Tamb
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            TambField;
+    region          exitRegion;
+
+    codeRead
+    #{
+        if (!mesh().foundObject<volScalarField>("Tamb"))
+        {
+            volScalarField* ptr = new volScalarField
+            (
+                IOobject
+                (
+                    "Tamb",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    true
+                ),
+                mesh(),
+                dimensionedScalar("Tamb", dimTemperature, 300)
+            );
+            ptr->store();
+        }
+    #};
+}
+
+// energyAudit: the energy and mass books every 100 iterations (grep energyAudit log.*).
+//   patch  : mdot = sum(phi) [kg/s, out +], Hout = sum(phi*h) [W, out +],
+//            Qcond = sum(kappa*snGrad(T)*|Sf|) [W, into the region], Qrad = sum(qr*|Sf|) [W, absorbed]
+//   region : sum(Qcond - Hout) + int a (G - 4 sigma T^4) dV                    -> 0 (h equation)
+//   join   : faceBalance = Qrad_up + Qrad_dn - Qcond_up - Qcond_dn              -> 0 (BC = fvDOM books)
+//            dMass = mdot_up + mdot_dn, dH = Hout_up + Hout_dn                  -> 0
+//            dTf = max |Tf_up - Tf_dn| face by face (mapped)                    -> 0
+//   wall   : Qrad - Qcond - loss(h, epsOut, Ta as in radiativeWallT)           -> 0
+//   radiation: sum over all surfaces of Qrad + int a (G - 4 sigma T^4) dV       -> 0 (ray convergence)
+//   global : G*A_window - escape(inlet, window, outlet) - airEnthalpyRise - wallLoss -> 0
+energyAudit
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            energyAudit;
+    region          inletRegion;        // any existing region (there is no region0 mesh)
+    executeControl  timeStep;
+    executeInterval 100;
+    writeControl    timeStep;
+    writeInterval   100;
+
+    codeContext
+    {
+        #include "$FOAM_CASE/system/caseParameters"    // G [W/m2]
+    }
+
+    codeInclude
+    #{
+        #include "basicThermo.H"
+        #include "wallFvPatch.H"
+        #include "mappedPatchBase.H"
+        #include "physicoChemicalConstants.H"
+    #};
+
+    codeOptions
+    #{
+        -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude
+    #};
+
+    codeLibs
+    #{
+        -lfluidThermophysicalModels
+    #};
+
+    codeExecute
+    #{
+        const scalar sigma  = constant::physicoChemical::sigma.value();
+        const scalar hExt   = 5.0;      // as system/radiativeWallT
+        const scalar epsOut = 0.92;
+        const scalar Ta     = 300.0;
+        const scalar qBeam  = codeContext().get<scalar>("G");
+
+        HashTable<scalar> Hout, Qcond, Qrad, mdot;
+        scalar wallLoss = 0, volRad = 0, surfRad = 0, Awin = 0;
+
+        for
+        (
+            const word& rn
+          : wordList({word("inletRegion"), word("porousRegion"), word("exitRegion")})
+        )
+        {
+            const fvMesh& m = time().lookupObject<fvMesh>(rn);
+            const basicThermo& th = m.lookupObject<basicThermo>(basicThermo::dictName);
+            const volScalarField& T = th.T();
+            const volScalarField& he = th.he();
+            const surfaceScalarField& phi = m.lookupObject<surfaceScalarField>("phi");
+            const volScalarField* qrPtr = m.cfindObject<volScalarField>("qr");
+
+            scalar res = 0;
+            forAll(m.boundary(), patchi)
+            {
+                const fvPatch& pp = m.boundary()[patchi];
+                if (pp.coupled())
+                {
+                    continue;                       // processor patches
+                }
+                const word& key = pp.name();
+                const scalarField& magSf = pp.magSf();
+
+                mdot.set(key, gSum(phi.boundaryField()[patchi]));
+                Hout.set(key, gSum(phi.boundaryField()[patchi]*he.boundaryField()[patchi]));
+                Qcond.set
+                (
+                    key,
+                    gSum(th.kappa(patchi)*T.boundaryField()[patchi].snGrad()*magSf)
+                );
+                Qrad.set
+                (
+                    key,
+                    qrPtr ? gSum(qrPtr->boundaryField()[patchi]*magSf) : scalar(0)
+                );
+                surfRad += Qrad[key];
+                res += Qcond[key] - Hout[key];
+
+                if (key == "opticalWindow")
+                {
+                    Awin = gSum(magSf);
+                }
+
+                // channel walls only: the joins are mappedWall, i.e. also wallFvPatch
+                // (mappedWallFvPatch.H:52-54)
+                if (isA<wallFvPatch>(pp) && !isA<mappedPatchBase>(pp.patch()))
+                {
+                    const scalarField& Tw = T.boundaryField()[patchi];
+                    const scalar loss = gSum
+                    (
+                        (hExt*(Tw - Ta) + epsOut*sigma*(pow4(Tw) - pow4(Ta)))*magSf
+                    );
+                    wallLoss += loss;
+                    Info<< "energyAudit wall " << key
+                        << " Qrad " << Qrad[key] << " Qcond " << Qcond[key]
+                        << " loss " << loss
+                        << " residual " << Qrad[key] - Qcond[key] - loss << nl;
+                }
+
+                Info<< "energyAudit patch " << rn << ' ' << key
+                    << " mdot " << mdot[key] << " Hout " << Hout[key]
+                    << " Qcond " << Qcond[key] << " Qrad " << Qrad[key] << nl;
+            }
+
+            const volScalarField* aPtr = m.cfindObject<volScalarField>("a");
+            const volScalarField* GPtr = m.cfindObject<volScalarField>("G");
+            if (aPtr && GPtr)
+            {
+                const scalar s = gSum
+                (
+                    aPtr->primitiveField()
+                   *(GPtr->primitiveField() - 4*sigma*pow4(T.primitiveField()))
+                   *m.V().field()
+                );
+                volRad += s;
+                res += s;
+            }
+            Info<< "energyAudit region " << rn << " residual " << res << nl;
+        }
+
+        // joins: face balance, mass and enthalpy continuity, face temperature agreement
+        const wordList upR({word("inletRegion"), word("porousRegion")});
+        const wordList up({word("inletRegion_to_porousRegion"), word("porousRegion_to_exitRegion")});
+        const wordList dn({word("porousRegion_to_inletRegion"), word("exitRegion_to_porousRegion")});
+        forAll(up, j)
+        {
+            const fvMesh& m = time().lookupObject<fvMesh>(upR[j]);
+            const label patchi = m.boundary().findPatchID(up[j]);
+            const mappedPatchBase& mpp =
+                refCast<const mappedPatchBase>(m.boundary()[patchi].patch());
+            const fvMesh& nbrMesh = refCast<const fvMesh>(mpp.sampleMesh());
+            const label nbrPatchi = mpp.samplePolyPatch().index();
+
+            scalarField TfN
+            (
+                nbrMesh.lookupObject<volScalarField>("T").boundaryField()[nbrPatchi]
+            );
+            mpp.distribute(TfN);                    // collective
+            const scalarField& Tf =
+                m.lookupObject<volScalarField>("T").boundaryField()[patchi];
+            const scalar dTf = gMax(mag(Tf - TfN));   // -GREAT only if the patch is empty
+
+            Info<< "energyAudit join " << up[j]
+                << " faceBalance " << Qrad[up[j]] + Qrad[dn[j]] - Qcond[up[j]] - Qcond[dn[j]]
+                << " (Qrad " << Qrad[up[j]] << " + " << Qrad[dn[j]]
+                << ", Qcond " << Qcond[up[j]] << " + " << Qcond[dn[j]] << ")"
+                << " dMass " << mdot[up[j]] + mdot[dn[j]]
+                << " dH " << Hout[up[j]] + Hout[dn[j]]
+                << " dTf " << dTf << nl;
+        }
+
+        const scalar beam = qBeam*Awin;
+        const scalar escape = Qrad["inlet"] + Qrad["opticalWindow"] + Qrad["outlet"] + beam;
+        const scalar dH =
+            Hout["inlet"] + Hout["opticalWindow"] + Hout["outlet"]
+          - Qcond["inlet"] - Qcond["opticalWindow"] - Qcond["outlet"];
+        const scalar resid = beam - escape - dH - wallLoss;
+
+        Info<< "energyAudit radiation surfaces+volume " << surfRad + volRad
+            << " (volume " << volRad << ")" << nl
+            << "energyAudit global beam " << beam
+            << " escape(inlet+window+outlet) " << escape
+            << " airEnthalpyRise " << dH
+            << " wallLoss " << wallLoss
+            << " residual " << resid
+            << " (" << 100*resid/max(beam, VSMALL) << " % of beam)" << endl;
+    #};
+}

@@ -1,0 +1,7 @@
+// Heat-transfer stage parameters (one case per G, Re and angular set; phi/U/p come from the split case)
+G               5e6;        // beam flux at the window [W/m2]: 1e6 | 5e6 | 1e7 (paper 2 Table 1)
+alphaEff        60;         // porous absorption coefficient [1/m]: 45 | 60 | 66 for G 1e6 | 5e6 | 1e7
+beamAxis        (0.99144486137381 -0.130526192220051 6.09890200452972e-17);   // beamAlign.py, set by Allrun.cht
+nPhi            6;          // set by Allrun.cht from the split case (log.beamAxis)
+nTheta          11;
+radFreq         20;         // fvDOM update interval (iterations); see runtime notes

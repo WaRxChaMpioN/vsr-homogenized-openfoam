@@ -1,0 +1,66 @@
+#!/bin/sh
+# Stage 3: frozen-flow energy + fvDOM for one (G, Re, angular set).
+# Run in a copy of case/cht:
+#   ./Allrun.cht <splitCase> <G> <alphaEff>        e.g. ../split_Re300_6x11 5e6 60
+#   SMOKE=1 ./Allrun.cht ...    throw-away copy: 5 iterations, rays every iteration, audit every
+#                               iteration (compiles the 4 dynamic-code objects)
+#   WARM=<case>/<time> ./Allrun.cht ...   start from the T field of a reconstructed time of another
+#                               run on the same flow split (any angular set or G: the cells are the
+#                               same). T only - never ILambda_*, which carry that run's qRadExt.
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+DESIGN=${DESIGN:-${VSR:?set VSR to the repository root}/case}
+SPLIT=${1:?splitCase}; G=${2:?G}; A=${3:?alphaEff}
+regions="inletRegion porousRegion exitRegion"
+app=chtMultiRegionSimpleFoam
+#------------------------------------------------------------------------------
+time=$(cat "$SPLIT"/FLOW_TIME)
+axis=$(sed 's/.*axis //' "$SPLIT"/log.beamAxis)
+nphi=$(awk '{print $2}' "$SPLIT"/log.beamAxis); ntheta=$(awk '{print $4}' "$SPLIT"/log.beamAxis)
+sed -i "s/^G .*/G               $G;/; s/^alphaEff .*/alphaEff        $A;/; s/^beamAxis .*/beamAxis        $axis;/; s/^nPhi .*/nPhi            $nphi;/; s/^nTheta .*/nTheta          $ntheta;/" system/caseParameters
+
+# frozen flow must be on in EVERY region: it is read once at start-up (createFluidFields.H:199),
+# and an unfrozen region would solve U/p with 'calculated' join patches (ill-posed)
+for R in $regions
+do
+    grep -Eq '^[[:space:]]*frozenFlow[[:space:]]+(true|yes|on)[[:space:]]*;' system/$R/fvSolution \
+        || { echo "system/$R/fvSolution: frozenFlow is not true - abort"; exit 1; }
+done
+
+for R in $regions
+do
+    mkdir -p constant/$R 0/$R
+    rm -rf constant/$R/polyMesh
+    cp -r "$SPLIT"/constant/$R/polyMesh constant/$R/      # rotated, split mesh: never rotate again
+    for f in U p p_rgh phi
+    do
+        cp "$SPLIT"/"$time"/$R/$f 0/$R/
+    done
+    cp 0.templates/$R/* 0/$R/                             # T, IDefault (no ILambda_* files)
+    if [ -n "$WARM" ]
+    then
+        cp "$WARM"/$R/T 0/$R/T || exit 1
+    fi
+done
+
+if [ -n "$SMOKE" ]
+then
+    # sed, not foamDictionary: foamDictionary -set rewrites controlDict with its #include files
+    # expanded, which freezes balanceFunctions/auditFunctions as they were at that moment
+    sed -i "s/^endTime .*/endTime         5;/; s/^writeInterval .*/writeInterval   5;/" system/controlDict
+    sed -i "s/^radFreq .*/radFreq         1;/" system/caseParameters
+    sed -i "s/^\( *executeInterval\) 100;/\1 1;/" system/auditFunctions
+fi
+
+runApplication decomposePar -allRegions -force
+runParallel $app
+
+# post-run gates
+log=log.$app
+grep -q "FOAM FATAL" $log && { echo "FATAL ERROR in $log"; exit 1; }
+grep -Eq "Solving for (Ux|Uy|Uz|p_rgh)" $log && echo "FAIL: a region is not frozen (U/p_rgh solved)"
+grep -h "limited [1-9]" $log && echo "FAIL: limitTemperature clipped cells - run is not valid"
+grep "energyAudit" $log | tail -12
+runApplication reconstructPar -allRegions -latestTime
+python3 $DESIGN/scripts/energyBalance.py . "$G" | tee log.energyBalance
+#------------------------------------------------------------------------------

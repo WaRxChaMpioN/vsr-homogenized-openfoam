@@ -1,0 +1,4 @@
+// Flow stage. Edit per Reynolds number (Allrun.flow sets it):
+//   Re 300: 0.1068   Re 600: 0.2136   Re 900: 0.3204  m/s  (paper 2 Table 1)
+Uin             0.1068;
+UinNeg          -0.1068;

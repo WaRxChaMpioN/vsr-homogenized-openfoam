@@ -1,0 +1,7 @@
+FoamFile { version 2.0; format ascii; class dictionary; object regionProperties; }
+// Three regions of paper 2, no 0.5 mm slab. Solved in flow order each iteration.
+regions
+(
+    fluid       (inletRegion porousRegion exitRegion)
+    solid       ()
+);

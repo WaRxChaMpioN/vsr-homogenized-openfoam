@@ -1,0 +1,22 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
+// Flow stage only: radiation off, energy stays at 300 K. The CHT stage supplies its own T.
+// NB: regex entries are matched last-defined first, so ".*" must come BEFORE the specific one.
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 300;
+boundaryField
+{
+    ".*"
+    {
+        type            zeroGradient;
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 300;
+    }
+    opticalWindow
+    {
+        type            fixedValue;
+        value           uniform 300;
+    }
+}

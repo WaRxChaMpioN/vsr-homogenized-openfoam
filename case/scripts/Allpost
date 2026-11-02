@@ -1,0 +1,29 @@
+#!/bin/sh
+# Post-processing: copy the latest reconstructed time (no ray fields) to ./post and rotate the mesh and
+# the vector fields back (x = channel axis). The case itself stays rotated (restartable).
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+TOOLS=${TOOLS:-${VSR:?set VSR to the repository root}/tools}
+regions="inletRegion porousRegion exitRegion"
+time=$(foamListTimes -latestTime -noZero | tail -1)
+[ -n "$time" ] || { echo "No reconstructed time found"; exit 1; }
+rm -rf post && mkdir -p post/constant post/"$time"
+cp -r system post/ && cp constant/regionProperties post/constant/
+for R in $regions
+do
+    cp -r constant/"$R" post/constant/
+    mkdir -p post/"$time"/"$R"
+    find "$time"/"$R" -maxdepth 1 -type f ! -name 'ILambda_*' -exec cp {} post/"$time"/"$R"/ \;
+done
+[ -d "$time"/uniform ] && cp -r "$time"/uniform post/"$time"/
+nphi=$(awk '/^nPhi/{gsub(";","");print $2}' system/caseParameters)
+ntheta=$(awk '/^nTheta/{gsub(";","");print $2}' system/caseParameters)
+eval "$(python3 $TOOLS/beamAlign.py $nphi $ntheta --shell)"     # same angular set as the run
+(cd post && transformPoints -allRegions -rotateFields -time "$time" -rotate "$ROTATE_INV" > log.transformPoints 2>&1)
+for R in $regions
+do
+    (cd post && postProcess -region "$R" -time "$time" -func writeCellCentres > log.writeCellCentres."$R" 2>&1)
+    (cd post && postProcess -region "$R" -time "$time" -func writeCellVolumes > log.writeCellVolumes."$R" 2>&1)
+done
+touch post/post.foam
+echo "Un-rotated copy of time $time in ./post"

@@ -1,0 +1,56 @@
+FoamFile { version 2.0; format ascii; class dictionary; object controlDict; }
+
+// Flow stage (one region, UNROTATED frame). chtMultiRegionSimpleFoam has no residualControl:
+// it runs to endTime. Converge, then polish the pressure (fvSolution p_rgh relTol 0)
+// for the last iterations so that phi is divergence-free to ~1e-12 before the split.
+application     chtMultiRegionSimpleFoam;
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         3000;
+deltaT          1;
+writeControl    timeStep;
+writeInterval   500;
+purgeWrite      2;
+writeFormat     ascii;
+writePrecision  14;         // phi is carried into the CHT case: keep it exact
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        fields          (U p_rgh);
+        writeResidualFields no;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    mdot_outlet
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        regionType      patch;
+        name            outlet;
+        operation       sum;
+        fields          (phi);
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   10;
+        log             false;
+    }
+    // centreline pressure: point list written by scripts/rotPoints.py (unrotated flow frame)
+    pCentreline
+    {
+        type            probes;
+        libs            (sampling);
+        fields          (p);
+        writeControl    timeStep;
+        writeInterval   50;
+        #include        "$FOAM_CASE/system/probePoints"
+    }
+}

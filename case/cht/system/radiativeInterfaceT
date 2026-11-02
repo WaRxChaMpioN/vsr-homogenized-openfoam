@@ -1,0 +1,221 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Temperature BC of the opaque front and back faces of the porous zone
+  (front x = 75 mm, back x = 125 mm). Included on BOTH sides of BOTH faces:
+     0/inletRegion/T   inletRegion_to_porousRegion
+     0/porousRegion/T  porousRegion_to_inletRegion, porousRegion_to_exitRegion
+     0/exitRegion/T    exitRegion_to_porousRegion
+  The ray BC on all four patches must be greyDiffusiveRadiation (only that BC books qin/qr:
+  greyDiffusiveRadiationMixedFvPatchScalarField.C:181, 336-362).
+
+  Face balance (paper 2, Eq. bc_interface; T continuous; net radiation absorbed on both sides):
+     k1 (Tc1 - Tf) + k2 (Tc2 - Tf) + Qabs - E Tf^4 = 0
+     k      = kappa*deltaCoeffs of each side (kappa_f or kappa_con, from that region's thermo)
+     Qabs   = (1 - c1(1-eps1)) qin1 + (1 - c2(1-eps2)) qin2     (qin: fvDOM incident flux, beam incl.)
+     E      = (c1 eps1 + c2 eps2) sigma
+     c      = sum over the rays LEAVING the face on that side of (-n.dAve)/pi, computed from that
+              region's own fvDOM rays and its own patch normals (same test and weight as
+              greyDiffusive, lines 212 and 336-351); 0.99460 on these faces for 6 x 10
+     eps    = emissivity of that side from constant/<region>/boundaryRadiationProperties, i.e.
+              exactly the value the greyDiffusive rays use (line 186-191)
+  With c and eps taken from the radiation model itself, Qabs - E Tf^4 equals fvDOM's
+  qr(side 1) + qr(side 2) at convergence: the face creates and destroys no energy.
+
+  Only qin is explicit (frozen between ray solves). Emission is implicit: Newton on
+  f(T) = C - K T - E T^4 (decreasing, concave) from the upper bound min(C/K, (C/E)^1/4) converges
+  monotonically; the mixed coefficients are the tangent at T* with this side's cell implicit:
+     a = k2 + 4 E T*^3,  b = k2 Tc2 + Qabs + 3 E T*^4
+     refValue = b/a,  valueFraction = a/(a + k1),  refGradient = 0   =>  Tf = (k1 Tc1 + b)/(k1 + a)
+  Both sides solve the same balance, so they hold the same Tf at convergence.
+  h follows through mixedEnergy (mixedEnergyFvPatchScalarField.C:103-128).
+\*---------------------------------------------------------------------------*/
+
+type            codedMixed;
+name            radiativeInterfaceT;
+
+refValue        uniform 300;
+refGradient     uniform 0;
+valueFraction   uniform 1;
+value           uniform 300;
+
+codeInclude
+#{
+    #include "basicThermo.H"
+    #include "mappedPatchBase.H"
+    #include "fvDOM.H"
+    #include "boundaryRadiationProperties.H"
+    #include "physicoChemicalConstants.H"
+    #include "mathematicalConstants.H"
+#};
+
+// = src/thermophysicalModels/radiation/Make/options + the radiation lnInclude
+// (fvDOM.H pulls in solarLoad.H -> faceShading/faceReflecting/solarCalculator)
+codeOptions
+#{
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/fileFormats/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/transportModels/compressible/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/solidThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/SLGThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/thermophysicalProperties/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/reactionThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/radiation/lnInclude \
+    -I$(LIB_SRC)/parallel/distributed/lnInclude
+#};
+
+codeLibs
+#{
+    -lmeshTools \
+    -lfluidThermophysicalModels \
+    -lradiationModels
+#};
+
+localCode
+#{
+    // Weight of the rays leaving a face (outward normal nf) in this region's fvDOM:
+    // c = sum_{(-n.d) > 0} (-n.dAve)/pi. 1 if the region has no fvDOM (not expected).
+    static tmp<scalarField> radiativeInterfaceT_cOut
+    (
+        const objectRegistry& obr,
+        const vectorField& nf
+    )
+    {
+        tmp<scalarField> tc(new scalarField(nf.size(), scalar(1)));
+        const radiation::fvDOM* domPtr =
+            obr.cfindObject<radiation::fvDOM>("radiationProperties");
+
+        if (domPtr)
+        {
+            scalarField& c = tc.ref();
+            c = Zero;
+            for (label rayi = 0; rayi < domPtr->nRay(); ++rayi)
+            {
+                const vector& d = domPtr->IRay(rayi).d();
+                const vector& dAve = domPtr->IRay(rayi).dAve();
+                forAll(nf, facei)
+                {
+                    if ((-nf[facei] & d) > 0)
+                    {
+                        c[facei] -= (nf[facei] & dAve);
+                    }
+                }
+            }
+            c /= constant::mathematical::pi;
+        }
+        return tc;
+    }
+
+    // Incident flux qin of a region on one patch (0 before fvDOM has registered it)
+    static tmp<scalarField> radiativeInterfaceT_qin
+    (
+        const objectRegistry& obr,
+        const fvPatch& pp
+    )
+    {
+        const volScalarField* qinPtr = obr.cfindObject<volScalarField>("qin");
+        if (qinPtr)
+        {
+            return tmp<scalarField>
+            (
+                new scalarField(qinPtr->boundaryField()[pp.index()])
+            );
+        }
+        return tmp<scalarField>(new scalarField(pp.size(), Zero));
+    }
+#};
+
+code
+#{
+    const scalar sigma = constant::physicoChemical::sigma.value();
+
+    // Runs inside initEvaluate/evaluate: processor comms may be under way.
+    // Shift the tag as greyDiffusiveRadiation and turbulentTemperatureRadCoupledMixed do.
+    const int oldTag = UPstream::msgType();
+    UPstream::msgType() = oldTag + 1;
+
+    const fvPatch& p = this->patch();
+    const label patchi = p.index();
+    const fvMesh& mesh = this->internalField().mesh();
+
+    // ---- this side
+    const basicThermo& thermo =
+        mesh.lookupObject<basicThermo>(basicThermo::dictName);
+    const scalarField k1(thermo.kappa(patchi)*p.deltaCoeffs());
+    const scalarField Tc1(this->patchInternalField());
+    const scalarField qin1(radiativeInterfaceT_qin(mesh, p));
+    const scalarField c1(radiativeInterfaceT_cOut(mesh, p.nf()()));
+    const scalarField eps1
+    (
+        radiation::boundaryRadiationProperties::New(mesh).emissivity(patchi)
+    );
+
+    // ---- other side, evaluated in its own region and face order ...
+    const mappedPatchBase& mpp = refCast<const mappedPatchBase>(p.patch());
+    const fvMesh& nbrMesh = refCast<const fvMesh>(mpp.sampleMesh());
+    const label nbrPatchi = mpp.samplePolyPatch().index();
+    const fvPatch& nbrPatch = nbrMesh.boundary()[nbrPatchi];
+
+    const basicThermo& nbrThermo =
+        nbrMesh.lookupObject<basicThermo>(basicThermo::dictName);
+    scalarField k2(nbrThermo.kappa(nbrPatchi)*nbrPatch.deltaCoeffs());
+    scalarField Tc2(nbrThermo.T().boundaryField()[nbrPatchi].patchInternalField());
+    scalarField qin2(radiativeInterfaceT_qin(nbrMesh, nbrPatch));
+    scalarField c2(radiativeInterfaceT_cOut(nbrMesh, nbrPatch.nf()()));
+    scalarField eps2
+    (
+        radiation::boundaryRadiationProperties::New(nbrMesh).emissivity(nbrPatchi)
+    );
+
+    // ... then mapped onto this patch. Collective: every processor makes these calls,
+    // in the same order, also where the patch has no faces.
+    mpp.distribute(k2);
+    mpp.distribute(Tc2);
+    mpp.distribute(qin2);
+    mpp.distribute(c2);
+    mpp.distribute(eps2);
+
+    UPstream::msgType() = oldTag;
+
+    scalarField& rv = this->refValue();
+    scalarField& vf = this->valueFraction();
+
+    forAll(Tc1, facei)
+    {
+        const scalar ka = k1[facei];
+        const scalar kb = k2[facei];
+        const scalar K = ka + kb;
+
+        // net radiation absorbed by the face, as greyDiffusive books qr on each side
+        const scalar Qabs =
+            (1 - c1[facei]*(1 - eps1[facei]))*max(qin1[facei], scalar(0))
+          + (1 - c2[facei]*(1 - eps2[facei]))*max(qin2[facei], scalar(0));
+        const scalar E = (c1[facei]*eps1[facei] + c2[facei]*eps2[facei])*sigma;
+        const scalar C = ka*Tc1[facei] + kb*Tc2[facei] + Qabs;
+
+        // f(T) = C - K T - E T^4 = 0: Newton from an upper bound, monotone
+        scalar T = min(C/K, sqrt(sqrt(C/E)));
+        for (label iter = 0; iter < 50; ++iter)
+        {
+            const scalar dT = (C - K*T - E*pow4(T))/(-K - 4*E*pow3(T));
+            T -= dT;
+            if (mag(dT) < 1e-10*T)
+            {
+                break;
+            }
+        }
+
+        // tangent of the balance at T*, this side's cell implicit
+        const scalar a = kb + 4*E*pow3(T);
+        const scalar b = kb*Tc2[facei] + Qabs + 3*E*pow4(T);
+
+        rv[facei] = b/a;
+        vf[facei] = a/(a + ka);
+    }
+
+    this->refGrad() = Zero;
+#};
+
+// ************************************************************************* //

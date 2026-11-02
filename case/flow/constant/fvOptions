@@ -1,0 +1,33 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           |
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile { version 2.0; format ascii; class dictionary; object fvOptions; }
+
+// Paper 2 Eq. (darcy), Table 2: K = 3.08e-8 m2, c_F = 1.10
+//   d = 1/K = 3.2468e7 1/m2,  f = 2 c_F/sqrt(K) = 1.2536e4 1/m
+// OpenFOAM applies -(mu d + 0.5 rho |U| f) U (DarcyForchheimer.C). Isotropic, so the
+// coordinate system and the beam rotation do not matter.
+// Zone = the WHOLE porousRegion cellZone from blockMesh (x = 75-125 mm, 46,464 cells);
+// no topoSet box, no overlapping zone (splitMeshRegions -cellZonesOnly forbids a cell in
+// two zones).
+porosity
+{
+    type            explicitPorositySource;
+    explicitPorositySourceCoeffs
+    {
+        selectionMode   cellZone;
+        cellZone        porousRegion;
+        type            DarcyForchheimer;
+        d   (3.2468e7 3.2468e7 3.2468e7);
+        f   (1.2536e4 1.2536e4 1.2536e4);
+        coordinateSystem
+        {
+            origin  (0 0 0);
+            rotation none;
+        }
+    }
+}

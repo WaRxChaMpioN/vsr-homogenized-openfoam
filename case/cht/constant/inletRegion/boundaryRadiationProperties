@@ -1,0 +1,11 @@
+FoamFile { version 2.0; format ascii; class dictionary; object boundaryRadiationProperties; }
+// Every surface is opaque diffuse-grey with eps 0.92 (walls, inlet plane incl. window, and both
+// sides of the front and back faces). greyDiffusiveRadiation takes eps ONLY from here
+// (greyDiffusiveRadiationMixedFvPatchScalarField.C:188), never from the ray-file entries.
+".*"
+{
+    type            lookup;
+    emissivity      0.92;
+    absorptivity    0.92;
+    transmissivity  0;
+}

@@ -1,0 +1,35 @@
+FoamFile { version 2.0; format ascii; class dictionary; object fvSolution; }
+solvers
+{
+    "rho.*"         { solver diagonal; }
+    p_rgh           { solver GAMG; smoother GaussSeidel; tolerance 1e-9; relTol 0.01; }  // unused
+    "(U|h)"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-14;
+        relTol          0.01;
+    }
+    Ii
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-7;
+        relTol          0.05;
+        maxIter         10;
+    }
+}
+SIMPLE
+{
+    frozenFlow      true;   // read ONCE at start-up (createFluidFields.H:199): set before the run
+    momentumPredictor no;
+    nNonOrthogonalCorrectors 0;
+}
+relaxationFactors
+{
+    equations
+    {
+        h               0.9;
+        "ILambda.*"     1;
+    }
+}

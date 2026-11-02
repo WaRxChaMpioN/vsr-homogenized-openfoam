@@ -1,0 +1,11 @@
+FoamFile { version 2.0; format ascii; class dictionary; object fvOptions; }
+// Crash guard only. With bounded BCs nothing should be clipped: any 'Lower/Upper limited'
+// count > 0 in the log is a FAILED run (clipping creates or destroys energy).
+temperatureLimiter
+{
+    type            limitTemperature;
+    active          yes;
+    selectionMode   all;
+    min             200;
+    max             5000;
+}

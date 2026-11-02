@@ -1,0 +1,21 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object p_rgh; }
+dimensions      [1 -1 -2 0 0 0 0];
+internalField   uniform 0;
+boundaryField
+{
+    "(inlet|opticalWindow)"
+    {
+        type            fixedFluxPressure;
+        value           uniform 0;
+    }
+    "(inletWall|porousWall|exitWall)"
+    {
+        type            fixedFluxPressure;
+        value           uniform 0;
+    }
+    outlet
+    {
+        type            fixedValue;     // pressure level (gauge, relative to the outlet)
+        value           uniform 0;
+    }
+}

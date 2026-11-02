@@ -1,0 +1,9 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 300;
+boundaryField
+{
+    porousWall                  { #include "$FOAM_CASE/system/radiativeWallT" }        // kappa_con side
+    porousRegion_to_inletRegion { #include "$FOAM_CASE/system/radiativeInterfaceT" }   // front face, porous side
+    porousRegion_to_exitRegion  { #include "$FOAM_CASE/system/radiativeInterfaceT" }   // back face, porous side
+}

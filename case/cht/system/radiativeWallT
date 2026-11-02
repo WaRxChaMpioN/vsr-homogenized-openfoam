@@ -1,0 +1,139 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Channel-wall temperature BC (inletWall, porousWall, exitWall).
+  Paper 2 Eq. bc_wall:
+     kappa*delta*(Tc - Tw) + q_rad,w = h (Tw - Ta) + epsOut sigma (Tw^4 - Ta^4)
+  with the inside radiation written exactly as fvDOM books it on a greyDiffusive face,
+     q_rad,w = (1 - c(1-eps)) qin - c eps sigma Tw^4,
+  c = sum over the rays leaving the wall of (-n.dAve)/pi (0.988-0.992 on these walls for 6x10)
+  and eps from constant/<region>/boundaryRadiationProperties (what the rays use), so that
+  wall loss = conduction + fvDOM qr exactly. kappa from thermo: kappa_f in the air regions,
+  kappa_con in porousRegion. Only qin is explicit; Newton from an upper bound, tangent mixed
+  condition (same method as the case's working system/radiativeWallT).
+  Outside: h = 5 W/m2K, epsOut = 0.92, Ta = 300 K (the same constants are used by energyAudit).
+\*---------------------------------------------------------------------------*/
+
+type            codedMixed;
+name            radiativeWallTc;
+
+refValue        uniform 300;
+refGradient     uniform 0;
+valueFraction   uniform 1;
+value           uniform 300;
+
+codeInclude
+#{
+    #include "basicThermo.H"
+    #include "fvDOM.H"
+    #include "boundaryRadiationProperties.H"
+    #include "physicoChemicalConstants.H"
+    #include "mathematicalConstants.H"
+#};
+
+codeOptions
+#{
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/fileFormats/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/transportModels/compressible/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/solidThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/SLGThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/thermophysicalProperties/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/reactionThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/radiation/lnInclude \
+    -I$(LIB_SRC)/parallel/distributed/lnInclude
+#};
+
+codeLibs
+#{
+    -lfluidThermophysicalModels \
+    -lradiationModels
+#};
+
+code
+#{
+    const scalar h      = 5.0;      // external natural convection [W/m2/K]
+    const scalar epsOut = 0.92;     // outer surface emissivity (paper 2 Table 1)
+    const scalar Ta     = 300.0;    // surroundings [K]
+    const scalar sigma  = constant::physicoChemical::sigma.value();
+
+    const fvPatch& p = this->patch();
+    const label patchi = p.index();
+    const fvMesh& mesh = this->internalField().mesh();
+    const vectorField nf(p.nf());
+
+    // fvDOM weight of the rays leaving the wall (same test/weight as greyDiffusive)
+    scalarField c(p.size(), scalar(1));
+    const radiation::fvDOM* domPtr =
+        mesh.cfindObject<radiation::fvDOM>("radiationProperties");
+    if (domPtr)
+    {
+        c = Zero;
+        for (label rayi = 0; rayi < domPtr->nRay(); ++rayi)
+        {
+            const vector& d = domPtr->IRay(rayi).d();
+            const vector& dAve = domPtr->IRay(rayi).dAve();
+            forAll(nf, facei)
+            {
+                if ((-nf[facei] & d) > 0)
+                {
+                    c[facei] -= (nf[facei] & dAve);
+                }
+            }
+        }
+        c /= constant::mathematical::pi;
+    }
+
+    const scalarField eps
+    (
+        radiation::boundaryRadiationProperties::New(mesh).emissivity(patchi)
+    );
+
+    const basicThermo& thermo =
+        mesh.lookupObject<basicThermo>(basicThermo::dictName);
+    const scalarField kd(thermo.kappa(patchi)*p.deltaCoeffs());
+    const scalarField Tc(this->patchInternalField());
+
+    scalarField qin(p.size(), Zero);
+    const volScalarField* qinPtr = mesh.cfindObject<volScalarField>("qin");
+    if (qinPtr)
+    {
+        qin = qinPtr->boundaryField()[patchi];
+    }
+
+    scalarField& rv = this->refValue();
+    scalarField& vf = this->valueFraction();
+
+    forAll(Tc, facei)
+    {
+        const scalar k = kd[facei];
+        const scalar Qabs = (1 - c[facei]*(1 - eps[facei]))*max(qin[facei], scalar(0));
+        const scalar E = (c[facei]*eps[facei] + epsOut)*sigma;    // inside + outside emission
+        const scalar C = k*Tc[facei] + Qabs + epsOut*sigma*pow4(Ta) + h*Ta;
+
+        // f(T) = C - (k + h) T - E T^4 = 0: Newton from an upper bound, monotone
+        scalar T = min(C/(k + h), sqrt(sqrt(C/E)));
+        for (label iter = 0; iter < 50; ++iter)
+        {
+            const scalar dT = (C - (k + h)*T - E*pow4(T))/(-(k + h) - 4*E*pow3(T));
+            T -= dT;
+            if (mag(dT) < 1e-10*T)
+            {
+                break;
+            }
+        }
+
+        // tangent at T*, cell implicit
+        const scalar a = h + 4*E*pow3(T);
+        const scalar b = Qabs + h*Ta + epsOut*sigma*pow4(Ta) + 3*E*pow4(T);
+
+        rv[facei] = b/a;
+        vf[facei] = a/(a + k);
+    }
+
+    this->refGrad() = Zero;
+#};
+
+// ************************************************************************* //

@@ -1,0 +1,16 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           |
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile { version 2.0; format ascii; class dictionary; object regionProperties; }
+
+// Flow stage: ONE fluid region on the whole channel. region0 = the default
+// mesh (constant/polyMesh, 0/, system/fvSolution). 'solid ()' is required by the solver.
+regions
+(
+    fluid       (region0)
+    solid       ()
+);

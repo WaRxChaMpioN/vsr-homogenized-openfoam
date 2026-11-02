@@ -1,0 +1,19 @@
+FoamFile { version 2.0; format ascii; class dictionary; object fvSchemes; }
+ddtSchemes      { default steadyState; }
+gradSchemes
+{
+    default         Gauss linear;
+    limitedGrad     cellLimited Gauss linear 1;
+}
+divSchemes
+{
+    default         none;
+    div(phi,U)      bounded Gauss linearUpwind limitedGrad;     // not used (frozen flow)
+    div(phi,h)      bounded Gauss linearUpwind limitedGrad;     // phi conservative -> 'bounded' adds ~0
+    div(phi,K)      Gauss linear;
+    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+    div(Ji,Ii_h)    Gauss linearUpwind limitedGrad;             // bounded rays, aligned beam
+}
+laplacianSchemes { default Gauss linear corrected; }
+interpolationSchemes { default linear; }
+snGradSchemes   { default corrected; }

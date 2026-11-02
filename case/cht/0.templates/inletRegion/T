@@ -1,0 +1,10 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 300;
+boundaryField
+{
+    inlet                       { type fixedValue; value uniform 300; }  // inlet plane at T_in = 300 K
+    opticalWindow               { type fixedValue; value uniform 300; }
+    inletWall                   { #include "$FOAM_CASE/system/radiativeWallT" }
+    inletRegion_to_porousRegion { #include "$FOAM_CASE/system/radiativeInterfaceT" }   // front face, air side
+}

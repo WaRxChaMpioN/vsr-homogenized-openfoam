@@ -1,0 +1,27 @@
+FoamFile { version 2.0; format ascii; class volVectorField; object U; }
+#include "$FOAM_CASE/system/caseParameters"
+dimensions      [0 1 -1 0 0 0 0];
+internalField   uniform (0 0 0);
+boundaryField
+{
+    inlet
+    {
+        type            surfaceNormalFixedValue;    // normal to the inlet plane (unrotated in the flow stage)
+        refValue        uniform $UinNeg;            // negative = into the domain
+        value           uniform (0 0 0);
+    }
+    opticalWindow
+    {
+        type            surfaceNormalFixedValue;
+        refValue        uniform $UinNeg;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            zeroGradient;               // paper Eq. bc_outlet
+    }
+    "(inletWall|porousWall|exitWall)"
+    {
+        type            noSlip;
+    }
+}

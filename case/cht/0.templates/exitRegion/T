@@ -1,0 +1,9 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object T; }
+dimensions      [0 0 0 1 0 0 0];
+internalField   uniform 300;
+boundaryField
+{
+    exitWall                    { #include "$FOAM_CASE/system/radiativeWallT" }
+    exitRegion_to_porousRegion  { #include "$FOAM_CASE/system/radiativeInterfaceT" }   // back face, air side
+    outlet                      { type zeroGradient; }                                 // paper Eq. bc_outlet
+}

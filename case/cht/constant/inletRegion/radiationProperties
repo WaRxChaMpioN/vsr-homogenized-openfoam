@@ -1,0 +1,23 @@
+FoamFile { version 2.0; format ascii; class dictionary; object radiationProperties; }
+#include "$FOAM_CASE/system/caseParameters"
+// Non-participating air (paper 2: alpha = 0 outside the porous zone): surface exchange only
+radiation       on;
+radiationModel  fvDOM;
+fvDOMCoeffs
+{
+    nPhi        $nPhi;       // identical in all regions (beam ray and c weights)
+    nTheta      $nTheta;
+    tolerance   1e-3;
+    maxIter     1;
+}
+solverFreq      $radFreq;
+absorptionEmissionModel constantAbsorptionEmission;
+constantAbsorptionEmissionCoeffs
+{
+    absorptivity    absorptivity    [0 -1 0 0 0 0 0] 0;
+    emissivity      emissivity      [0 -1 0 0 0 0 0] 0;
+    E               E               [1 -1 -3 0 0 0 0] 0;
+}
+scatterModel    none;
+sootModel       none;
+transmissivityModel none;

@@ -1,0 +1,36 @@
+#!/bin/sh
+# Stage 1: single-region flow for one Reynolds number, solved in the UNROTATED
+# frame (x = channel axis). One flow run per Re serves every G and every angular set: the beam
+# rotation is applied afterwards, to mesh and fields, by Allrun.split.
+# Run in a copy of case/flow:
+#   ./Allrun.flow <Uin>        Uin = 0.1068 (Re 300) | 0.2136 (Re 600) | 0.3204 (Re 900)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+DESIGN=${DESIGN:-${VSR:?set VSR to the repository root}/case}
+Uin=${1:?Uin}
+#------------------------------------------------------------------------------
+
+sed -i "s/^Uin .*/Uin             $Uin;/; s/^UinNeg .*/UinNeg          -$Uin;/" system/caseParameters
+
+# 1. one mesh, three cellZones (inletRegion porousRegion exitRegion), no slab
+runApplication blockMesh
+runApplication checkMesh -constant
+python3 $DESIGN/scripts/rotPoints.py '(1 0 0)' > system/probePoints     # centreline probes
+
+# 2. flow only (no constant/radiationProperties -> radiation none); Darcy-Forchheimer on the
+#    whole porousRegion cellZone; T stays 300 K
+runApplication decomposePar -force
+runParallel $(getApplication)
+
+# 3. polish: tight pressure solves so the phi that will be frozen is divergence-free to solver
+#    precision (acceptance is restorePhi's relative 1e-8 checks, not 'sum local')
+foamDictionary system/fvSolution -entry solvers/p_rgh/relTol    -set 0     > /dev/null
+foamDictionary system/fvSolution -entry solvers/p_rgh/tolerance -set 1e-12 > /dev/null
+end=$(foamDictionary system/controlDict -entry endTime -value)
+foamDictionary system/controlDict -entry endTime       -set $((end + 50)) > /dev/null
+foamDictionary system/controlDict -entry writeInterval -set 50            > /dev/null
+runParallel -s polish $(getApplication)
+runApplication reconstructPar -latestTime
+foamListTimes -latestTime | tail -1 > FLOW_TIME
+echo "flow solution at time $(cat FLOW_TIME); next: Allrun.split <thisCase> <nPhi> <nTheta>"
+#------------------------------------------------------------------------------

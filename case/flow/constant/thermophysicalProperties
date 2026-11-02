@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           |
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile { version 2.0; format ascii; class dictionary; object thermophysicalProperties; }
+
+// Air, paper 2 Table 2: rho 1.225, cp 1006, kappa_f 0.026, mu 1.8e-5.
+// Constant properties and g = 0: the flow does not depend on T, so this flow is
+// exactly the flow of the coupled model (and serves every G at this Re).
+thermoType
+{
+    type            heRhoThermo;
+    mixture         pureMixture;
+    transport       const;
+    thermo          hConst;
+    equationOfState rhoConst;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+mixture
+{
+    specie          { molWeight 28.96; }
+    equationOfState { rho 1.225; }
+    thermodynamics  { Cp 1006; Hf 0; }
+    transport       { mu 1.8e-5; Pr 0.696462; }   // mu*Cp/kappa_f = 1.8e-5*1006/0.026
+}

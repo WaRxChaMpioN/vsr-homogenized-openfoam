@@ -1,0 +1,33 @@
+#!/bin/sh
+# Stage 2: beam alignment + split for ONE angular set. Run in a NEW, EMPTY
+# directory that contains only this script:
+#   ./Allrun.split <flowCase> <nPhi> <nTheta>        e.g. ../flow_Re300 6 11   (use an odd nTheta)
+# 1. copies the converged single-region flow (serial, latest time only)
+# 2. rotates mesh AND fields so +x maps onto dAve of the beam ray: U is rotated, phi (a face
+#    flux) is re-read and re-written unchanged (transformPoints.C:120-170, -rotateFields)
+# 3. splits into the three paper regions and rebuilds phi on the four joins (restorePhi.py
+#    exits non-zero unless every mass check passes)
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+TOOLS=${TOOLS:-${VSR:?set VSR to the repository root}/tools}
+DESIGN=${DESIGN:-${VSR:?set VSR to the repository root}/case}
+FLOW=${1:?flowCase}; NPHI=${2:?nPhi}; NTHETA=${3:?nTheta}
+#------------------------------------------------------------------------------
+time=$(cat "$FLOW"/FLOW_TIME)
+[ -d "$FLOW/$time" ] || { echo "no reconstructed time $time in $FLOW"; exit 1; }
+cp -r "$FLOW"/system "$FLOW"/constant .
+cp -r "$FLOW"/"$time" .
+
+eval "$(python3 $TOOLS/beamAlign.py $NPHI $NTHETA --shell)"
+echo "nPhi $NPHI nTheta $NTHETA beam ray ILambda_${BEAM_RAY}_0, axis $BEAM_AXIS" | tee log.beamAxis
+# log.beamAxis stays one line (Allrun.cht parses it); see beamAlign.py for the sink rays
+[ "$SINK_RAYS" -eq 0 ] || echo "WARNING: $SINK_RAYS boundary sink rays (nTheta $NTHETA is even):" \
+    "negative intensities next to the porous faces - use an odd nTheta"
+runApplication transformPoints -time "$time" -rotateFields -rotate "$ROTATE_FWD"
+
+runApplication splitMeshRegions -cellZonesOnly -overwrite
+python3 $DESIGN/scripts/restorePhi.py . "$time" --peclet 8.12e-5 > log.restorePhi 2>&1 \
+    || { cat log.restorePhi; echo "restorePhi FAILED: do not use this split"; exit 1; }
+cat log.restorePhi
+echo "$time" > FLOW_TIME
+#------------------------------------------------------------------------------

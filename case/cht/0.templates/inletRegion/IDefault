@@ -1,0 +1,36 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object IDefault; }
+#include "$FOAM_CASE/system/caseParameters"
+// fvDOM clones IDefault for every ray that has no ILambda_<i>_0 file (radiativeIntensityRay.C,
+// IDefault fallback), so no per-ray files are needed: every ray BC is greyDiffusiveRadiation.
+// eps = 0.92 comes from constant/inletRegion/boundaryRadiationProperties.
+dimensions      [1 0 -3 0 0 0 0];
+internalField   uniform 0;
+boundaryField
+{
+    inlet
+    {
+        type            greyDiffusiveRadiation;     // inlet plane: eps 0.92 surface at 300 K
+        T               T;
+        value           uniform 0;
+    }
+    opticalWindow
+    {
+        type            greyDiffusiveRadiation;     // same surface + the collimated beam
+        T               T;
+        qRadExt         $G;                         // W/m2, carried by the ray closest to qRadExtDir
+        qRadExtDir      $beamAxis;                  // rotated channel axis = dAve of that ray
+        value           uniform 0;
+    }
+    inletWall
+    {
+        type            greyDiffusiveRadiation;
+        T               T;
+        value           uniform 0;
+    }
+    inletRegion_to_porousRegion                     // front face seen from upstream: OPAQUE
+    {
+        type            greyDiffusiveRadiation;     // absorbs (1-c*0.08) qin incl. the beam,
+        T               T;                          // reflects 8 % diffusely, emits at the face T
+        value           uniform 0;
+    }
+}

@@ -1,0 +1,96 @@
+#!/bin/bash
+# The (G, Re) matrix of paper 2, G = 1e6, 5e6, 1e7 W/m2 x Re = 300, 600, 900, with one ray set.
+# Run in an empty run directory, with OpenFOAM-v2206 sourced:
+#   export VSR=/path/to/vsr-homogenized-openfoam
+#   $VSR/case/scripts/Allrun.matrix > log.matrix 2>&1
+#   $VSR/case/scripts/stopWhenConverged.sh > log.stopper 2>&1 &     (optional: ends runs at convergence)
+# 1. the flow for Re 300, 600 and 900 (NPBASE ranks) and the beam-aligned splits;
+# 2. G5e6_Re300 from 300 K (NPBASE ranks, ENDCOLD iterations);
+# 3. the other eight cases in two lanes of NP ranks, each started from the T field of the nearest
+#    finished case (same mesh, so T is copied cell by cell): a new G gets ENDG iterations, a new Re
+#    at the same G gets END.
+# Every finished case is post-processed for the figures: Allpost (un-rotated copy), profiles.py,
+# negativeRays.py, and T/qr of the previous write time for the drift check.
+# Finished steps are skipped, so the script can be re-run after an interruption.
+. ${WM_PROJECT_DIR:?source the OpenFOAM-v2206 bashrc first}/bin/tools/RunFunctions
+VSR=${VSR:?set VSR to the repository root}
+export DESIGN=${DESIGN:-$VSR/case}
+TOOLS=${TOOLS:-$VSR/tools}
+export OMPI_MCA_hwloc_base_binding_policy=none      # two jobs at once: no pinning to the same cores
+NP=${NP:-10}; NPBASE=${NPBASE:-14}; END=${END:-6000}; ENDG=${ENDG:-8000}; ENDCOLD=${ENDCOLD:-8000}
+NPHI=${NPHI:-6}; NTHETA=${NTHETA:-11}; R=${NPHI}x${NTHETA}
+alpha() { case $1 in 1e6) echo 45;; 5e6) echo 60;; 1e7) echo 66;; esac; }
+uin()   { case $1 in 300) echo 0.1068;; 600) echo 0.2136;; 900) echo 0.3204;; esac; }
+log()   { echo "$(date '+%F %T') $*"; }
+setnp() { sed -i "s/^numberOfSubdomains .*/numberOfSubdomains $1;/" $2/system/decomposeParDict $2/system/*/decomposeParDict 2>/dev/null; }
+#------------------------------------------------------------------------------
+
+flow() {    # Re
+    [ -f flow_Re$1/FLOW_TIME ] && return
+    log "flow Re $1"
+    rm -rf flow_Re$1 && cp -r $DESIGN/flow flow_Re$1 && cp $DESIGN/scripts/Allrun.flow flow_Re$1/
+    setnp $NPBASE flow_Re$1
+    (cd flow_Re$1 && ./Allrun.flow $(uin $1) > log.Allrun 2>&1) && [ -f flow_Re$1/FLOW_TIME ] \
+        || { log "flow Re $1 FAILED (see flow_Re$1/log.*)"; exit 1; }
+}
+
+split() {   # Re
+    local d=split_Re$1_$R
+    [ -f $d/FLOW_TIME ] && return
+    log "split Re $1"
+    rm -rf $d && mkdir $d && cp $DESIGN/scripts/Allrun.split $d/
+    (cd $d && ./Allrun.split ../flow_Re$1 $NPHI $NTHETA > log.Allrun 2>&1)
+    grep -q 'ALL CHECKS PASSED' $d/log.Allrun || { log "split Re $1 FAILED (see $d/log.Allrun)"; exit 1; }
+}
+
+cht() {     # G Re warmCase|'' endTime nprocs
+    local c=G$1_Re$2_$R w=$3 wt warm=
+    [ -f $c/post/post.foam ] && return
+    if [ -n "$w" ]
+    then
+        wt=$(cd $w && foamListTimes -latestTime -noZero | tail -1)
+        warm=../$w/$wt
+    fi
+    log "cht $c from ${warm:-300 K}, endTime $4"
+    rm -rf $c && cp -r $DESIGN/cht $c && cp $DESIGN/scripts/Allrun.cht $DESIGN/scripts/Allpost $c/
+    setnp $5 $c
+    sed -i "s/^endTime .*/endTime         $4;/" $c/system/controlDict
+    (
+        cd $c || exit 1
+        WARM=$warm ./Allrun.cht ../split_Re$2_$R $1 $(alpha $1) > log.Allrun 2>&1 || exit 1
+        grep -q CLOSURE log.energyBalance || exit 1
+        ./Allpost > log.Allpost 2>&1 || exit 1
+        t=$(foamListTimes -latestTime -noZero | tail -1)
+        reconstructPar -allRegions -time $((t - 1000)) -fields '(T qr)' > log.reconstructPar.prev 2>&1
+        mkdir -p figures
+        python3 $TOOLS/profiles.py post $t figures/profiles_$t.csv > log.profiles 2>&1
+        python3 $TOOLS/negativeRays.py . $t > log.negativeRays 2>&1
+        true
+    ) || { log "cht $c FAILED (see $c/log.Allrun)"; return 1; }
+    log "cht $c done: $(grep CLOSURE $c/log.energyBalance | sed 's/^ *//'); $(grep 'bulk T out' $c/log.energyBalance | sed 's/^ *//')"
+}
+
+lane1() {
+    cht 1e6 300 G5e6_Re300_$R $ENDG $NP || return
+    cht 5e6 600 G5e6_Re300_$R $END $NP  || return
+    cht 1e6 600 G1e6_Re300_$R $END $NP  || return
+    cht 1e6 900 G1e6_Re600_$R $END $NP
+}
+
+lane2() {
+    cht 1e7 300 G5e6_Re300_$R $ENDG $NP || return
+    cht 5e6 900 G5e6_Re300_$R $END $NP  || return
+    cht 1e7 600 G1e7_Re300_$R $END $NP  || return
+    cht 1e7 900 G1e7_Re600_$R $END $NP
+}
+#------------------------------------------------------------------------------
+
+for Re in 300 600 900; do flow $Re; done
+for Re in 300 600 900; do split $Re; done
+cht 5e6 300 '' $ENDCOLD $NPBASE || exit 1
+lane1 > log.matrix.lane1 2>&1 &
+lane2 > log.matrix.lane2 2>&1 &
+wait
+log "matrix finished"
+cat log.matrix.lane1 log.matrix.lane2
+#------------------------------------------------------------------------------

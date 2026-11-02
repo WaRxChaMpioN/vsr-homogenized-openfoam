@@ -1,0 +1,21 @@
+FoamFile { version 2.0; format ascii; class dictionary; object thermophysicalProperties; }
+// Pseudo-porous zone (paper 2 Table 2): air rho/cp/mu (superficial velocity, LTE) with the
+// conductive effective conductivity kappa_con = 24.5 W/mK: Pr = mu cp/kappa_con = 7.3910e-4.
+// const transport reads only mu and Pr; Pr enters only the heat diffusivity (flow is frozen anyway).
+thermoType
+{
+    type            heRhoThermo;
+    mixture         pureMixture;
+    transport       const;
+    thermo          hConst;
+    equationOfState rhoConst;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+mixture
+{
+    specie          { molWeight 28.96; }
+    equationOfState { rho 1.225; }
+    thermodynamics  { Cp 1006; Hf 0; }
+    transport       { mu 1.8e-5; Pr 7.39102e-4; }
+}

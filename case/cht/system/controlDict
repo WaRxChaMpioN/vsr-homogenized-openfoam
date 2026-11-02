@@ -1,0 +1,27 @@
+FoamFile { version 2.0; format ascii; class dictionary; object controlDict; }
+
+// Heat-transfer stage: energy + fvDOM only, flow frozen (SIMPLE{frozenFlow true} in every
+// system/<region>/fvSolution, checked by Allrun.cht). phi/U/p/p_rgh come from the split
+// single-region flow run (Allrun.split). phi is AUTO_WRITE and re-read on restart, so it is
+// written with 14 digits like the flow stage.
+application     chtMultiRegionSimpleFoam;
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         8000;
+deltaT          1;
+writeControl    timeStep;
+writeInterval   1000;
+purgeWrite      2;
+writeFormat     ascii;
+writePrecision  14;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    #include "balanceFunctions"
+    #include "auditFunctions"
+}

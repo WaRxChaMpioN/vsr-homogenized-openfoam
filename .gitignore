@@ -1,0 +1,18 @@
+# simulation output (run the cases outside the repository or in runs/)
+runs/
+processor*/
+[1-9]*/
+postProcessing/
+dynamicCode/
+post/
+log.*
+*.foam
+*.OpenFOAM
+FLOW_TIME
+
+# generated figures and tables
+figures/out/
+
+# Python
+__pycache__/
+*.pyc
